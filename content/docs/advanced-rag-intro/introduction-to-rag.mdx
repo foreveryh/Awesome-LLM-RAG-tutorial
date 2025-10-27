@@ -1,0 +1,352 @@
+---
+title: "Introduction to Retrieval Augmented Generation (RAG) | 检索增强生成 (RAG) 入门"
+description: "Learn about Retrieval-Augmented Generation (RAG), a framework that enhances the capabilities of generative models by allowing them to reference external data. | 了解检索增强生成 (RAG)，一种通过允许引用外部数据来增强生成模型能力的框架。"
+---
+
+# Introduction to Retrieval Augmented Generation (RAG)
+# 检索增强生成 (RAG) 入门
+
+Despite the steady release of increasingly larger and smarter models, state-of-the-art generative large language models (LLMs) still have a big problem: they struggle with tasks that require specialized knowledge. This lack of specialized knowledge can lead to issues like hallucinations, where the model generates inaccurate or fabricated information. **Retrieval-Augmented Generation (RAG)** helps mitigate this by allowing the model to pull in real-time, niche data from external sources, enhancing its ability to provide accurate and detailed responses.
+
+尽管不断发布越来越大型和更智能的模型，最先进的生成式大语言模型（LLMs）仍然存在一个大问题：它们在需要专门知识的任务上存在困难。这种专门知识的缺乏可能导致幻觉等问题，即模型生成不准确或编造的信息。**检索增强生成（RAG）**通过允许模型从外部来源获取实时的、专门的数据，帮助缓解这个问题，增强其提供准确和详细响应的能力。
+
+Despite these limitations, generative models are impactful tools that automate mundane processes, assist us in our everyday work, and enable us to interact with data in new ways. So how can we leverage their broad knowledge while also making them work for our specific use cases? The answer lies in providing generative models with task-specific data.
+
+尽管存在这些限制，生成式模型仍然是具有影响力的工具，它们自动化平凡流程，协助我们的日常工作，并使我们能够以新方式与数据交互。那么，我们如何在利用其广泛知识的同时，让它们也适用于我们的特定用例呢？答案在于为生成式模型提供特定于任务的数据。
+
+In this article, we take a deep dive into Retrieval Augmented Generation (RAG), a framework that enhances the capabilities of generative models by allowing them to reference external data. We'll explore the limitations of generative models that led to the creation of RAG, explain how RAG works, and break down the architecture behind RAG pipelines. We'll also get practical and outline some real-world RAG use cases, suggest concrete ways to implement RAG, introduce you to a few advanced RAG techniques, and discuss RAG evaluation methods.
+
+在本文中，我们将深入探讨检索增强生成（RAG），一种通过允许引用外部数据来增强生成模型能力的框架。我们将探讨导致RAG创建的生成模型的局限性，解释RAG的工作原理，并剖析RAG流水线背后的架构。我们还将变得实用，概述一些现实世界的RAG用例，建议实施RAG的具体方法，向您介绍一些高级RAG技术，并讨论RAG评估方法。
+
+:::note
+LLM is a broad term that refers to language models trained on large datasets that are capable of performing a variety of text- and language-related tasks. LLMs that generate novel text in response to a user prompt, like those used in chatbots, are called generative LLMs, or **generative models**. LLMs that encode text data in the semantic space are called **embedding models**. Thus, we use the terms generative model and embedding model to distinguish between these two types of models in this article.
+
+LLM是一个广义术语，指的是在大型数据集上训练的语言模型，能够执行各种文本和语言相关任务。响应用户提示生成新文本的LLM，如聊天机器人中使用的，称为生成式LLM或**生成模型**。在语义空间中对文本数据进行编码的LLM称为**嵌入模型**。因此，我们在本文中使用生成模型和嵌入模型这两个术语来区分这两种类型的模型。
+:::
+
+## Limitations of generative models
+## 生成模型的局限性
+
+Generative models are trained on large datasets, including (but not limited to) social media posts, books, scholarly articles and scraped webpages, allowing them to acquire a sense of general knowledge. As a result, these models can generate human-like text, respond to diverse questions, and assist with tasks like answering, summarizing, and creative writing.
+
+生成模型在大型数据集上进行训练，包括（但不限于）社交媒体帖子、书籍、学术文章和抓取的网页，使它们能够获得一般知识的感觉。因此，这些模型可以生成类似人类的文本，回答多样化的问题，并协助完成诸如回答、总结和创意写作等任务。
+
+However, training datasets for generative models are inevitably incomplete, as they lack information on niche topics and new developments beyond the dataset's cutoff date. Generative models also lack access to proprietary data from internal databases or repositories. Furthermore, when these models don't know the answer to a question, they often guess, and sometimes not very well. This tendency to generate incorrect or fabricated information in a convincing manner is known as hallucination, and can cause real reputational damage in client-facing AI applications.
+
+然而，生成模型的训练数据集不可避免地是不完整的，因为它们缺乏关于小众主题和数据集截止日期之后的新发展的信息。生成模型还无法访问内部数据库或存储库的专有数据。此外，当这些模型不知道问题的答案时，它们经常猜测，而且有时猜得不太好。这种以令人信服的方式生成错误或编造信息的倾向被称为幻觉，在面向客户的AI应用程序中可能造成真正的声誉损害。
+
+The key to enhancing performance on specialized tasks and reducing hallucinations is to provide generative models with additional information not found in their training data. This is where RAG comes in.
+
+在专门任务上提高性能并减少幻觉的关键是为生成模型提供其训练数据中未包含的额外信息。这就是RAG发挥作用的地方。
+
+## What is Retrieval Augmented Generation (RAG)?
+## 什么是检索增强生成 (RAG)？
+
+[**Retrieval-Augmented Generation (RAG)**](https://arxiv.org/abs/2005.11401) is a framework that _augments_ the general knowledge of a generative LLM by providing it with additional data relevant to the task at hand _retrieved_ from an external data source.
+
+[**检索增强生成（RAG）**](https://arxiv.org/abs/2005.11401)是一个通过提供从外部数据源_检索到的_与手头任务相关的额外数据来_增强_生成LLM的一般知识的框架。
+
+External data sources can include internal databases, files, and repositories, as well as publicly available data such as news articles, websites, or other online content. Access to this data empowers the model to respond more factually, cite its sources in its responses, and avoid "guessing" when prompted about information not found in the model's original training dataset.
+
+外部数据源可以包括内部数据库、文件和存储库，以及公开可用的数据，如新闻文章、网站或其他在线内容。访问这些数据使模型能够更事实地响应，在回答中引用其来源，并避免在提示关于模型原始训练数据集中未包含的信息时"猜测"。
+
+Common use cases for RAG include retrieving up-to-date information, accessing specialized domain knowledge, and answering complex, data-driven queries.
+
+RAG的常见用例包括检索最新信息、访问专门的领域知识，以及回答复杂的、数据驱动的查询。
+
+## RAG architecture
+## RAG架构
+
+The basic parts of a RAG pipeline can be broken down into **three components**: an external knowledge source, a prompt template, and a generative model. Together, these components enable LLM-powered applications to generate more accurate responses by leveraging valuable task-specific data.
+
+RAG流水线的基本部分可以分解为**三个组件**：外部知识源、提示模板和生成模型。这些组件共同作用，使LLM驱动的应用程序能够通过利用宝贵的任务特定数据来生成更准确的响应。
+
+### External knowledge source
+### 外部知识源
+
+Without access to external knowledge, a generative model is limited to generating responses based only on its **parametric knowledge**, which is learned during the model training phase. With RAG, we have the opportunity to incorporate **external knowledge sources**, also referred to as **non-parametric knowledge**, in our pipeline.
+
+没有外部知识的访问权限，生成模型仅限于基于其**参数知识**生成响应，参数知识是在模型训练阶段学习的。有了RAG，我们有机会在流水线中整合**外部知识源**，也称为**非参数知识**。
+
+External data sources are often task-specific and likely beyond the scope of the model's original training data, or its parametric knowledge. Furthermore, they are often stored in vector databases and can vary widely in topic and format.
+
+外部数据源通常是特定于任务的，可能超出模型原始训练数据或其参数知识的范围。此外，它们通常存储在向量数据库中，在主题和格式上可能差异很大。
+
+Popular sources of external data include internal company databases, legal codes and documents, medical and scientific literature, and scraped webpages. Private data sources can be used in RAG as well. Personal AI assistants, like Microsoft's Copilot, leverage multiple sources of personal data including, emails, documents, and instant messages to provide tailored responses and automate tasks more efficiently.
+
+外部数据的流行来源包括内部公司数据库、法律条文和文档、医学和科学文献，以及抓取的网页。私有数据源也可以在RAG中使用。像Microsoft的Copilot这样的个人AI助手，利用包括电子邮件、文档和即时消息在内的多个个人数据源来提供定制响应并更有效地自动化任务。
+
+### Prompt template
+### 提示模板
+
+Prompts are the tools we use to communicate our requests to generative models. Prompts may contain several elements, but generally include a query, instructions, and context that guides the model in generating a relevant response.
+
+提示是我们用来与生成模型通信的工具。提示可能包含几个元素，但通常包括查询、指导和在生成相关响应中指导模型的上下文。
+
+**Prompt templates** provide a structured way to generate standardized prompts, in which various queries and contexts can be inserted. In a RAG pipeline, relevant data is retrieved from an external data source and inserted into prompt templates, thus augmenting the prompt. Essentially, prompt templates act as the bridge between the external data and the model, providing the model with contextually relevant information during inference to generate an accurate response.
+
+**提示模板**提供了一种生成标准化提示的结构化方式，可以插入各种查询和上下文。在RAG流水线中，从外部数据源检索相关数据并插入到提示模板中，从而增强提示。本质上，提示模板充当外部数据和模型之间的桥梁，在推理过程中为模型提供上下文相关的信息以生成准确的响应。
+
+```python
+prompt_template = "Context information is below.\n" \
+                  "---------------------\n" \
+                  "{context_str}\n" \
+                  "---------------------\n" \
+                  "Given the context information and not prior knowledge, " \
+                  "answer the query.\n" \
+                  "Query: {query_str}\n" \
+                  "Answer: "
+```
+
+### Generative large language model (LLM)
+### 生成式大语言模型 (LLM)
+
+The final component in RAG is the generative LLM, or generative model, which is used to generate a final response to the user's query. The augmented prompt, enriched with information from the external knowledge base, is sent to the model, which generates a response that combines the model's internal knowledge with the newly retrieved data.
+
+RAG中的最后一个组件是生成式LLM或生成模型，用于生成对用户查询的最终响应。增强了来自外部知识库信息的提示被发送到模型，模型生成一个将模型内部知识与新检索的数据相结合的响应。
+
+Now that we've covered the RAG architecture and its key components, let's see how they come together in a RAG workflow.
+
+现在我们已经涵盖了RAG架构及其关键组件，让我们看看它们如何在RAG工作流程中结合在一起。
+
+## How does RAG work?
+## RAG如何工作？
+
+RAG is a multi-step framework that works in two stages. First, the external knowledge is preprocessed and prepared for retrieval during the ingestion stage. Next, during the inference stage, the model retrieves relevant data from the external knowledge base, augments it with the user's prompt, and generates a response. Now, let's take a closer look at each of these stages.
+
+RAG是一个多步骤框架，分为两个阶段工作。首先，外部知识在摄取阶段被预处理并准备进行检索。接下来，在推理阶段，模型从外部知识库检索相关数据，用用户提示增强数据，并生成响应。现在，让我们仔细看看这些阶段。
+
+### Stage 1: Ingestion
+### 阶段 1：摄取
+
+First, the external knowledge source needs to be prepared. Essentially, the external data needs to be cleaned and transformed into a format that the model can understand. This is called the **ingestion stage**. During ingestion, text or image data is transformed from its raw format into **embeddings** through a process called **vectorization**. Once embeddings are generated, they need to be stored in a manner that allows them to be retrieved at a later time. Most commonly, these embeddings are stored in a vector database, which allows for quick, efficient retrieval of the information for downstream tasks.
+
+首先，需要准备外部知识源。基本上，外部数据需要被清理并转换为模型可以理解的格式。这被称为**摄取阶段**。在摄取过程中，文本或图像数据通过称为**向量化**的过程从原始格式转换为**嵌入**。一旦生成嵌入，就需要以允许在以后检索的方式存储它们。最常见的是，这些嵌入存储在向量数据库中，这允许为下游任务快速有效地检索信息。
+
+### Stage 2: Inference
+### 阶段 2：推理
+
+After external data is encoded and stored, it's ready to be retrieved during **inference**, when the model generates a response or answers a question. Inference is broken down into three steps: retrieval, augmentation, and generation.
+
+外部数据编码和存储后，它准备在**推理**期间检索，此时模型生成响应或回答问题。推理分为三个步骤：检索、增强和生成。
+
+#### Retrieval
+#### 检索
+
+The inference stage starts with retrieval, in which data is retrieved from an external knowledge source in relation to a user query. Retrieval methods vary in format and complexity, however in the naive RAG schema, in which external knowledge is embedded and stored in a vector database, similarity search is the simplest form of retrieval.
+
+推理阶段从检索开始，从外部知识源检索与用户查询相关的数据。检索方法在格式和复杂性上各不相同，然而在简单的RAG模式中，外部知识被嵌入并存储在向量数据库中，相似性搜索是最简单的检索形式。
+
+To perform similarity search, the user query must be first embedded in the same multi-dimensional space as the external data, which allows for direct comparison between the query and embedded external data. During [**similarity search**](https://docs.weaviate.io/weaviate/search/similarity), the distance between the query and external data points is calculated, returning those with the shortest distance and completing the retrieval process.
+
+为了执行相似性搜索，用户查询必须首先嵌入在与外部数据相同的多元空间中，这允许在查询和嵌入的外部数据之间进行直接比较。在[**相似性搜索**](https://docs.weaviate.io/weaviate/search/similarity)期间，计算查询和外部数据点之间的距离，返回距离最短的数据点并完成检索过程。
+
+#### Augmentation
+#### 增强
+
+Once the most relevant data points from the external data source have been retrieved, the augmentation process integrates this external information by inserting it into a predefined prompt template.
+
+一旦从外部数据源检索到最相关的数据点，增强过程通过将其插入预定义的提示模板来集成这个外部信息。
+
+#### Generation
+#### 生成
+
+After the augmented prompt is injected into the model's context window, it proceeds to generate the final response to the user's prompt. In the generation phase, the model combines both its internal language understanding and the augmented external data to produce a coherent, contextually appropriate answer.
+
+将增强提示注入模型的上下文窗口后，它继续生成对用户提示的最终响应。在生成阶段，模型结合其内部语言理解和增强的外部数据来产生连贯的、上下文适当的答案。
+
+This step involves crafting the response in a fluent, natural manner while drawing on the enriched information to ensure that the output is both accurate and relevant to the user's query. While augmentation is about incorporating external facts, generation is about transforming that combined knowledge into a well-formed, human-like output tailored to the specific request.
+
+这一步涉及以流畅、自然的方式制作响应，同时利用丰富的信息来确保输出既准确又与用户查询相关。虽然增强是关于整合外部事实，但生成是关于将这种组合的知识转化为针对特定请求的、良好的、类似人类的输出。
+
+## RAG use cases
+## RAG用例
+
+Now that we've covered what RAG is, how it works, and its architecture, let's explore some practical use cases to see how this framework is applied in real-world scenarios. Augmenting generative LLMs with up-to-date, task-specific data boosts their accuracy, relevance, and ability to handle specialized tasks. Consequently, RAG is widely used for real-time information retrieval, creating content recommendation systems, and building personal AI assistants.
+
+现在我们已经涵盖了RAG是什么，它如何工作，以及它的架构，让我们探索一些实际用例，看看这个框架如何在现实世界场景中应用。用最新的、任务特定的数据增强生成式LLM可以提高其准确性、相关性以及处理专门任务的能力。因此，RAG广泛用于实时信息检索、创建内容推荐系统和构建个人AI助手。
+
+### Real-time information retrieval
+### 实时信息检索
+
+When used alone, generative models are limited to retrieving only information found in their training dataset. When used in the context of RAG, however, these models can retrieve data and information from external sources, ensuring more accurate and up-to-date responses. One such example is ChatGPT-4o's ability to access and retrieve information directly from the web in real-time. This is an example of a RAG use case that leverages an external data source that is _not_ embedded in a vector database and can be especially useful in responding to user queries regarding the news or other current events, such as stock prices, travel advisories, and weather updates.
+
+单独使用时，生成模型仅限于检索其训练数据集中找到的信息。然而，当在RAG的上下文中使用时，这些模型可以从外部源检索数据和信息，确保更准确和最新的响应。一个这样的例子是ChatGPT-4o能够实时访问和检索来自网络的信息。这是一个利用_未_嵌入在向量数据库中的外部数据源的RAG用例示例，在响应用户关于新闻或其他当前事件的查询（如股票价格、旅行建议和天气更新）时特别有用。
+
+### Content recommendation systems
+### 内容推荐系统
+
+Content recommendation systems analyze user data and preferences to suggest relevant products or content to users. Traditionally, these systems required sophisticated ensemble models and massive user preference datasets. RAG simplifies recommendation systems directly integrating external, contextually relevant user data with the model's general knowledge, allowing it to generate personalized recommendations.
+
+内容推荐系统分析用户数据和偏好，向用户推荐相关的产品或内容。传统上，这些系统需要复杂的集成模型和庞大的用户偏好数据集。RAG简化了推荐系统，直接将外部的、上下文相关的用户数据与模型的一般知识整合，允许它生成个性化推荐。
+
+### Personal AI assistants
+### 个人AI助手
+
+Our personal data, including files, emails, Slack messages, and notes are a valuable source of data for generative models. Running RAG over our personal data enables us to interact with it in a conversational way, increasing efficiency and allowing for the automation of mundane tasks. With AI assistants, such as Microsoft's Copilot and Notion's Ask AI, we can use simple prompts to search for relevant documents, write personalized emails, summarize documents and meeting notes, schedule meetings, and more.
+
+我们的个人数据，包括文件、电子邮件、Slack消息和笔记，是生成模型的有价值的数据源。对我们的个人数据运行RAG使我们能够以对话方式与其交互，提高效率并允许自动化平凡任务。使用AI助手，如Microsoft的Copilot和Notion的Ask AI，我们可以使用简单提示搜索相关文档、编写个性化电子邮件、总结文档和会议笔记、安排会议等等。
+
+## How to implement RAG
+## 如何实现RAG
+
+Now that we know how RAG works, let's explore how to build a functional RAG pipeline. RAG can be implemented through a number of different frameworks, which simplify the building process by providing pre-built tools and modules for integrating individual RAG components as well as external services like vector databases, embedding generation tools, and other APIs.
+
+现在我们知道了RAG如何工作，让我们探索如何构建一个功能性的RAG流水线。RAG可以通过许多不同的框架实现，这些框架通过提供预构建的工具和模块来简化构建过程，用于集成各个RAG组件以及外部服务，如向量数据库、嵌入生成工具和其他API。
+
+LangChain, LlamaIndex, and DSPy are all robust open source Python libraries with highly engaged communities that offer powerful tools and integrations for building and optimizing RAG pipelines and LLM applications.
+
+LangChain、LlamaIndex和DSPy都是具有高度参与社区的强大开源Python库，为构建和优化RAG流水线和LLM应用程序提供强大的工具和集成。
+
+* [**LangChain**](https://www.langchain.com/) provides building blocks, components, and third-party integrations to aid in the development of LLM-powered applications. It can be used with [LangGraph](https://langchain-ai.github.io/langgraph/tutorials/introduction/) for building agentic RAG pipelines and [LangSmith](https://docs.smith.langchain.com/) for RAG evaluation.
+* [**LangChain**](https://www.langchain.com/) 提供构建块、组件和第三方集成来帮助开发LLM驱动的应用程序。它可以与[LangGraph](https://langchain-ai.github.io/langgraph/tutorials/introduction/)一起用于构建智能体RAG流水线，与[LangSmith](https://docs.smith.langchain.com/)一起用于RAG评估。
+
+* [**LlamaIndex**](https://www.llamaindex.ai/) is a framework that offers tools to build LLM-powered applications integrated with external data sources. LlamaIndex maintains the [LlamaHub](https://llamahub.ai/), a rich repository of data loaders, agent tools, datasets, and other components, that streamline the creation of RAG pipelines.
+* [**LlamaIndex**](https://www.llamaindex.ai/)是一个框架，提供工具来构建与外部数据源集成的LLM驱动的应用程序。LlamaIndex维护[LlamaHub](https://llamahub.ai/)，这是一个丰富的数据加载器、代理工具、数据集和其他组件的存储库，简化了RAG流水线的创建。
+
+* [**DSPy**](https://dspy-docs.vercel.app/) is a modular framework for optimizing LLM pipelines. Both LLMs and RMs (Retrieval Models) can be configured within DSPy, allowing for seamless optimization of RAG pipelines.
+* [**DSPy**](https://dspy-docs.vercel.app/)是用于优化LLM流水线的模块化框架。LLMs和RMs（检索模型）都可以在DSPy内配置，允许无缝优化RAG流水线。
+
+:::note
+Weaviate provides [integrations](https://docs.weaviate.io/integrations) and [recipes](https://github.com/weaviate/recipes) for each of these frameworks. For specific examples, take a look at our notebooks that show how to build RAG pipelines with Weaviate and [LlamaIndex](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/llamaindex/retrieval-augmented-generation/naive_rag.ipynb) and [DSPy](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/dspy/1.Getting-Started-with-RAG-in-DSPy.ipynb).
+Weaviate为这些框架中的每一个提供[集成](https://docs.weaviate.io/integrations)和[配方](https://github.com/weaviate/recipes)。有关具体示例，请查看我们的笔记本，展示如何用Weaviate和[LlamaIndex](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/llamaindex/retrieval-augmented-generation/naive_rag.ipynb)和[DSPy](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/dspy/1.Getting-Started-with-RAG-in-DSPy.ipynb)构建RAG流水线。
+:::
+
+If you're looking for a way to get up and running with RAG quickly, check out [**Verba**](https://github.com/weaviate/Verba), an open source out-of-the-box RAG application with a shiny, pre-built frontend. Verba enables you to visually explore datasets, extract insights, and build customizable RAG pipelines in just a few easy steps, without having to learn an entirely new framework. Verba is a multifunctional tool that can be used as a playground for testing and experimenting with RAG pipelines as well as for personal tasks like assisting with research, analyzing internal documents, and streamlining various RAG-related tasks.
+
+如果您正在寻找一种快速开始使用RAG的方法，请查看[**Verba**](https://github.com/weaviate/Verba)，这是一个具有闪亮预构建前端的开源开箱即用的RAG应用程序。Verba使您能够通过几个简单的步骤直观地探索数据集、提取见解并构建可定制的RAG流水线，而无需学习全新的框架。Verba是一个多功能工具，可以用作用于是测试和实验RAG流水线的游乐场，以及用于协助研究、分析内部文档和简化各种RAG相关任务等个人任务。
+
+Out-of-the-box RAG implementation with Verba
+用Verba实现的开箱即用的RAG
+
+## RAG techniques
+## RAG技术
+
+The vanilla RAG workflow is generally composed of an external data source embedded in a vector database retrieved via similarity search. However, there are several ways to enhance RAG workflows to yield more accurate and robust results, which collectively are referred to as advanced RAG.
+
+基本的RAG工作流程通常由嵌入在向量数据库中的外部数据源组成，通过相似性搜索检索。然而，有几种方法可以增强RAG工作流程以产生更准确和更稳健的结果，这些方法统称为高级RAG。
+
+Functionality of RAG pipelines can be further extended by incorporating the use of graph databases and agents, which enable even more advanced reasoning and dynamic data retrieval. In this next section, we'll go over some common advanced RAG techniques and give you an overview of Agentic RAG and Graph RAG.
+
+RAG流水线的功能可以通过结合图数据库和代理的使用进一步扩展，这可以实现更高级的推理和动态数据检索。在下一个部分中，我们将讨论一些常见的高级RAG技术，并向您介绍智能体RAG和Graph RAG的概述。
+
+### Advanced RAG
+### 高级RAG
+
+Advanced RAG techniques can be deployed at various stages in the pipeline. Pre-retrieval strategies like **metadata filtering** and text **chunking** can help improve the retrieval efficiency and relevance by narrowing down the search space and ensuring only the most relevant sections of data are considered. Employing more advanced retrieval techniques, such as **hybrid search**, which combines the strengths of similarity search with keyword search, can also yield more robust retrieval results. Finally, **re-ranking** retrieved results with a ranker model and using a generative LLM **fine-tuned** on domain-specific data help improve the quality of generated results.
+
+高级RAG技术可以在流水线的各个阶段部署。**元数据过滤**和文本**分块**等预检索策略可以通过缩小搜索空间并确保仅考虑数据的最相关部分来帮助提高检索效率和相关性。采用更高级的检索技术，如**混合搜索**，结合相似性搜索和关键字搜索的优势，也可以产生更稳健的检索结果。最后，使用排序器模型对检索结果进行**重新排序**和使用**微调的**生成式LLM在特定领域的数据上可以帮助提高生成结果的质量。
+
+For a more in-depth exploration of this topic, check out our blog post on [advanced RAG techniques](https://weaviate.io/blog/advanced-rag#3-fine-tuning-embedding-models).
+有关这个主题的更深入探索，请查看我们关于[高级RAG技术](https://weaviate.io/blog/advanced-rag#3-fine-tuning-embedding-models)的博客文章。
+
+### Agentic RAG
+### 智能体RAG
+
+**AI agents** are autonomous systems that can interpret information, formulate plans, and make decisions. When added to a RAG pipeline, agents can reformulate user queries and re-retrieve more relevant information if initial results are inaccurate or irrelevant. Agentic RAG can also handle more complex queries that require multi-step reasoning, like comparing information across multiple documents, asking follow-up questions, and iteratively adjusting retrieval and generation strategies.
+
+**AI代理**是能够解释信息、制定计划并做出决策的自主系统。当添加到RAG流水线时，如果初始结果不准确或不相关，代理可以重新表述用户查询并重新检索更相关的信息。智能体RAG还可以处理需要多步推理的更复杂查询，如比较多个文档中的信息、提出后续问题以及迭代调整检索和生成策略。
+
+To take a closer look at a RAG pipeline that incorporates agents, check out this [blog on Agentic RAG](https://weaviate.io/blog/what-is-agentic-rag).
+要仔细查看包含代理的RAG流水线，请查看这篇关于[智能体RAG](https://weaviate.io/blog/what-is-agentic-rag)的博客文章。
+
+### Graph RAG
+### 图RAG
+
+While traditional RAG excels at simple question answering tasks that can be resolved by retrieval alone, it is unable to answer questions and draw conclusions over an _entire_ external knowledge base. Graph RAG aims to solve this by using a generative model to create a knowledge graph that extracts and stores the relationships between key entities and can then be added as a data source to the RAG pipeline. This enables the RAG system to respond to queries asking to compare and summarize multiple documents and data sources.
+
+虽然传统RAG在可以通过检索单独解决的简单问答任务方面表现出色，但无法对_整个_外部知识库回答问题和得出结论。Graph RAG旨在通过使用生成模型创建知识图来解决这个问题，该知识图提取和存储关键实体之间的关系，然后可以作为数据源添加到RAG流水线中。这使RAG系统能够响应要求比较和总结多个文档和数据源的查询。
+
+For more information on building graph RAG pipelines, take a look at Microsoft's GraphRAG [package](https://github.com/microsoft/graphrag/tree/main?tab=readme-ov-file) and [documentation](https://microsoft.github.io/graphrag/).
+有关构建图RAG流水线的更多信息，请查看Microsoft的GraphRAG[包](https://github.com/microsoft/graphrag/tree/main?tab=readme-ov-file)和[文档](https://microsoft.github.io/graphrag/)。
+
+## How to evaluate RAG
+## 如何评估RAG
+
+RAG is a multi-stage, multi-step framework that requires both holistic and granular [evaluation](https://weaviate.io/blog/rag-evaluation). This approach ensures both component-level reliability and high-level accuracy. In this section, we'll explore both of these evaluation approaches and touch on RAGAS, a popular evaluation framework.
+
+RAG是一个多阶段、多步骤的框架，需要整体和细粒度的[评估](https://weaviate.io/blog/rag-evaluation)。这种方法确保了组件级可靠性和高级别的准确性。在本节中，我们将探讨这两种评估方法，并涉及RAGAS，一个流行的评估框架。
+
+### Component-level evaluation
+### 组件级评估
+
+On a component-level, RAG evaluation generally focuses on assessing the quality of the retriever and the generator, as they both play critical roles in producing accurate and relevant responses.
+
+在组件级别上，RAG评估通常专注于评估检索器和生成器的质量，因为它们在产生准确和相关的响应中都发挥着关键作用。
+
+Evaluation of the retriever centers around accuracy and relevance. In this context, **accuracy** measures how precisely the retriever selects information that directly addresses the query, while **relevance** assesses how closely the retrieved data aligns with the specific needs and context of the query.
+
+对检索器的评估围绕准确性和相关性进行。在这种背景下，**准确性**衡量检索器选择直接解决问题的信息的精确程度，而**相关性**评估检索到的数据与查询的特定需求和上下文的吻合程度。
+
+On the other hand, evaluation of the generator focuses on faithfulness and correctness. **Faithfulness** evaluates whether the response generated by the model accurately represents the information from the relevant documents and checks how consistent the response is with the original sources. **Correctness** assesses whether the generated response is truly factual and aligns with the ground truth or expected answer based on the query's context.
+
+另一方面，对生成器的评估关注忠实性和正确性。**忠实性**评估模型生成的响应是否准确表示来自相关文档的信息，并检查响应与原始来源的一致性。**正确性**评估生成的响应是否真正符合事实，并根据查询的上下文与基本事实或预期答案对齐。
+
+### End-to-end evaluation
+### 端到端评估
+
+Although the retriever and the generator are two distinct components, they rely on each other to produce coherent responses to user queries.
+
+尽管检索器和生成器是两个不同的组件，但它们相互依赖来产生对用户查询的连贯响应。
+
+Calculating Answer Semantic Similarity is a simple and efficient method of assessing how well the retriever and generator work together. **Answer Semantic Similarity** calculates the semantic similarity between generated responses and ground truth samples. Generated responses with a high degree of similarity to ground truth samples are indicative of a pipeline that can retrieve relevant information and generate contextually appropriate responses.
+
+计算答案语义相似性是评估检索器和生成器协同工作程度的一种简单有效的方法。**答案语义相似性**计算生成响应和基本事实样本之间的语义相似性。与基本事实样本具有高度相似性的生成响应表明流水线能够检索相关信息并生成上下文适当的响应。
+
+:::note
+RAG evaluation frameworks offer structured methods, tools, or platforms to evaluate RAG pipelines. [**RAGAS**](https://docs.ragas.io/en/stable/index.html#) (Retrieval Augmented Generation Assessment) is an especially popular framework, as it offers a suite of metrics to assess retrieval relevance, generation quality, and faithfulness without requiring human-labeled data. Listen to this [episode](https://www.youtube.com/watch?v=C-UQwvO8Koc) of the Weaviate podcast to learn more about how RAGAS works and advanced techniques for optimizing RAGAS scores, straight from the creators themselves.
+RAG评估框架提供结构化方法、工具或平台来评估RAG流水线。[**RAGAS**](https://docs.ragas.io/en/stable/index.html#)（检索增强生成评估）是一个特别流行的框架，因为它提供了一套指标来评估检索相关性、生成质量和忠实性，而不需要人工标记的数据。收听Weaviate播客的这一[集](https://www.youtube.com/watch?v=C-UQwvO8Koc)，直接从创作者那里了解RAGAS的工作原理以及优化RAGAS分数的高级技术。
+:::
+
+## RAG vs. fine-tuning
+## RAG与微调
+
+RAG is only one of several methods to expand the capabilities and mitigate the limitations of generative LLMs. Fine-tuning LLMs is a particularly popular technique for tailoring models to perform highly specialized tasks by training them on domain-specific data. While fine-tuning may be ideal for certain use cases, such as training a LLM to adopt a specific tone or writing style, RAG is often the lowest-hanging fruit for improving model accuracy, reducing hallucinations, and tailoring LLMs for specific tasks.
+
+RAG只是扩展生成式LLM能力和减轻其局限性的几种方法之一。微调LLMs是一种特别流行的技术，通过在特定领域的数据上训练模型来定制模型以执行高度专门的任务。虽然微调可能对某些用例是理想的，例如训练LLM采用特定语气或写作风格，但RAG通常是提高模型准确性、减少幻觉和为特定任务定制LLM的最简单方法。
+
+The beauty of RAG lies in the fact that the weights of the underlying generative model don't need to be updated, which can be costly and time-consuming. RAG allows models to access external data dynamically, improving accuracy without costly retraining. This makes it a practical solution for applications needing real-time information. In the next section, we'll dive deeper into the architecture of RAG and how its components work together to create a powerful retrieval-augmented system.
+
+RAG的美妙之处在于底层生成模型的权重不需要更新，这可能成本高昂且耗时。RAG允许模型动态访问外部数据，在不进行成本高昂的重新训练的情况下提高准确性。这使其成为需要实时信息的应用程序的实用解决方案。在下一部分中，我们将更深入地探讨RAG架构及其组件如何协同工作以创建一个强大的检索增强系统。
+
+## Summary
+## 摘要
+
+In this article, we introduced you to RAG, a framework that leverages task-specific external knowledge to improve the performance of applications powered by generative models. We learned about the different components of RAG pipelines, including external knowledge sources, prompt templates, and generative models as well as how they work together in retrieval, augmentation, and generation. We also discussed popular RAG use cases and frameworks for implementation, such as LangChain, LlamaIndex, and DSPy. Finally, we touched on some specialized RAG techniques, including advanced RAG methods, agentic RAG, and graph RAG as well as methods for evaluating RAG pipelines.
+
+在本文中，我们向您介绍了RAG，这是一个利用任务特定外部知识来提高生成模型驱动的应用程序性能的框架。我们了解了RAG流水线的不同组件，包括外部知识源、提示模板和生成模型，以及它们在检索、增强和生成中如何协同工作。我们还讨论了流行的RAG用例和实施框架，如LangChain、LlamaIndex和DSPy。最后，我们涉及了一些专门的RAG技术，包括高级RAG方法、智能体RAG和图RAG，以及评估RAG流水线的方法。
+
+At a minimum, each section in this post deserves its own individual blog post, if not an entire chapter in a book. As a result, we've put together a resource guide with academic papers, blog posts, YouTube videos, tutorials, notebooks, and recipes to help you learn more about the topics, frameworks, and methods presented in this article.
+
+至少，本文中的每一节都值得拥有自己的一篇博客文章，如果不是整本书的一章。因此，我们编制了一个资源指南，包含学术论文、博客文章、YouTube视频、教程、笔记本和配方，以帮助您了解更多关于本文介绍的主题、框架和方法。
+
+### Resource guide
+### 资源指南
+
+📄 [Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks](https://arxiv.org/abs/2005.11401) (Original RAG paper)
+📄 [用于知识密集型NLP任务的检索增强生成](https://arxiv.org/abs/2005.11401)（原始RAG论文）
+
+👩‍🍳 [Getting Started with RAG in DSPy](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/dspy/1.Getting-Started-with-RAG-in-DSPy.ipynb) (Recipe)
+👩‍🍳 [DSPy中RAG入门](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/dspy/1.Getting-Started-with-RAG-in-DSPy.ipynb)（配方）
+
+👩‍🍳 [Naive RAG with LlamaIndex](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/llamaindex/retrieval-augmented-generation/naive_rag.ipynb) (Recipe)
+👩‍🍳 [使用LlamaIndex的简单RAG](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/llamaindex/retrieval-augmented-generation/naive_rag.ipynb)（配方）
+
+📝 [Advanced RAG Techniques](https://weaviate.io/blog/advanced-rag#3-fine-tuning-embedding-models) (Blog post)
+📝 [高级RAG技术](https://weaviate.io/blog/advanced-rag#3-fine-tuning-embedding-models)（博客文章）
+
+📒 [Agentic RAG with Multi-Document Agents](https://github.com/cobusgreyling/LlamaIndex/blob/d8902482a247c76c7902ded143a875d5580f072a/Agentic_RAG_Multi_Document_Agents-v1.ipynb) (Notebook)
+📒 [使用多文档代理的智能体RAG](https://github.com/cobusgreyling/LlamaIndex/blob/d8902482a247c76c7902ded143a875d5580f072a/Agentic_RAG_Multi_Document_Agents-v1.ipynb)（笔记本）
+
+📝 [An Overview of RAG Evaluation](https://weaviate.io/blog/rag-evaluation) (Blog post)
+📝 [RAG评估概述](https://weaviate.io/blog/rag-evaluation)（博客文章）
+
+📄 [Evaluation of Retrieval-Augmented Generation: A Survey](https://arxiv.org/abs/2405.07437) (Academic paper)
+📄 [检索增强生成的评估：一项调查](https://arxiv.org/abs/2405.07437)（学术论文）
+
+## Ready to start building?
+## 准备开始构建？
+
+Check out the [Quickstart tutorial](https://docs.weaviate.io/weaviate/quickstart), or build amazing apps with a free trial of [Weaviate Cloud (WCD)](https://console.weaviate.cloud/).
+
+查看[快速入门教程](https://docs.weaviate.io/weaviate/quickstart)，或使用[Weaviate Cloud (WCD)](https://console.weaviate.cloud/)的免费试用版构建令人惊叹的应用程序。

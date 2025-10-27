@@ -1,0 +1,65 @@
+---
+title: 从零到一 RAG 实战（bRAG）
+description: 基于 bRAG-langchain 源码与其引用资料的从零到一 RAG 实战路线
+---
+
+> 说明：本系列以“代码为主、来源背书”为原则。所有实现均以 bRAG-langchain 的 notebooks 源码为准，语法/库用法仅放权威链接；若出现新的 RAG 设计模式且本站未覆盖，将在文末标注并提议纳入主文档。
+
+<img src="/images/brag/rag-architecture.png" alt="RAG Architecture" style={{width: "100%", maxWidth: 960}} />
+
+## 目录
+
+### 核心教程
+- **[1] 查询理解与转换** → /docs/brag-tutorial/1-query-understanding-transformation
+  - 查询重写、分解、扩展、HyDE等技术
+  - 完整代码实现与最佳实践
+
+- **[2] RAG融合与高级查询技术** → /docs/brag-tutorial/2-rag-fusion-advanced-query
+  - Multi-Query检索、RAG-Fusion
+  - 查询融合策略与性能优化
+
+- **[3] RAG路由与查询构建** → /docs/brag-tutorial/3-routing-query-construction
+  - 逻辑路由、语义路由
+  - Self-Query Retriever与元数据过滤
+
+- **[4] 高级索引与检索策略** → /docs/brag-tutorial/4-indexing-advanced-retrieval
+  - 智能文档分块、多向量索引
+  - 父文档检索、上下文压缩
+
+- **[5] 重排序与查询集成** → /docs/brag-tutorial/5-reranking-ensemble
+  - 交叉编码器重排序、RRF融合
+  - 多查询检索、混合检索
+
+### 参考资料
+- **参考资料汇总** → /docs/brag-tutorial/references
+
+## 快速开始（本地运行 notebooks）
+
+**macOS/Linux:**
+
+```bash
+python3.11 -m venv venv
+source venv/bin/activate
+pip install -r bRAG-langchain/requirements.txt
+python -m ipykernel install --user --name brag
+jupyter lab  # 或 jupyter notebook
+```
+
+**Windows:**
+
+```powershell
+py -3.11 -m venv venv
+venv\Scripts\activate
+pip install -r bRAG-langchain/requirements.txt
+python -m ipykernel install --user --name brag
+jupyter lab
+```
+
+<Callout>
+notebooks 本地路径：bRAG-langchain/notebooks/，建议按 [1] → [5] 顺序运行。
+</Callout>
+
+## 约定
+- 源码引用：优先展示“最小可复现代码块”，完整实现参考对应 notebook。
+- 语法类内容：仅放权威链接（LangChain / OpenAI / Cohere 等）。
+- 新设计模式：若本站未覆盖，将在各篇“新增模式”处标注，供纳入主文档评审。

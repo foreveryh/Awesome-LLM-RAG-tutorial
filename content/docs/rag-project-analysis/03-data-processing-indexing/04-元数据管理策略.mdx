@@ -1,0 +1,1002 @@
+---
+title: 元数据管理策略
+description: 从标签到版本控制的完整元数据工程方案
+---
+
+<Callout type="success" title="为什么元数据管理是 RAG 的隐藏杠杆">
+向量只能表达语义相似性，但业务需求往往需要更多维度的过滤（时间、权限、类别、版本）。合理的元数据管理可以将检索准确率提升 20-30%，同时实现权限控制、版本管理、多语言支持等高级功能。元数据是 RAG 从原型到生产的关键桥梁。
+</Callout>
+
+# 元数据管理策略
+
+## 背景与核心挑战
+
+### 什么是元数据？
+
+元数据（Metadata）是"关于数据的数据"，描述文档的属性和上下文：
+
+```json
+{
+  "vector_id": "doc_123_chunk_5",
+  "content": "机器学习是人工智能的分支...",
+  "embedding": [0.12, -0.34, ...],  // 向量
+  
+  // 元数据
+  "metadata": {
+    // 基础元数据
+    "source": "research_paper.pdf",
+    "page": 5,
+    "chunk_id": 5,
+    "title": "Introduction to ML",
+    "author": "Zhang San",
+    
+    // 业务元数据
+    "category": "AI/Machine Learning",
+    "language": "zh",
+    "created_at": "2024-01-15",
+    "updated_at": "2024-02-20",
+    
+    // 权限元数据
+    "owner": "team_ai",
+    "visibility": "internal",
+    "access_level": 2,
+    
+    // 版本元数据
+    "version": "v1.2",
+    "is_latest": true,
+    
+    // 质量元数据
+    "confidence_score": 0.92,
+    "word_count": 237
+  }
+}
+```
+
+### 元数据的关键作用
+
+| 作用 | 示例 | 价值 |
+|------|------|------|
+| **过滤检索** | 只搜索最近3个月的文档 | 提升准确率 20-30% |
+| **权限控制** | 不同用户看到不同文档 | 数据安全 |
+| **版本管理** | 总是使用最新版本 | 避免过时信息 |
+| **多语言支持** | 根据用户语言过滤 | 国际化 |
+| **质量保证** | 过滤低质量 chunk | 提升生成质量 |
+| **可追溯性** | 答案溯源到原始文档 | 可信度 + 调试 |
+
+### 元数据设计的核心原则
+
+1. **可查询性**：元数据字段必须支持高效过滤
+2. **一致性**：同类文档使用相同的元数据模式
+3. **最小化**：只存储必要的元数据（减少存储成本）
+4. **可扩展性**：支持动态添加新字段
+5. **版本化**：元数据模式本身也需要版本管理
+
+## 九大项目元数据方案全景
+
+| 项目 | 元数据丰富度 | 权限控制 | 版本管理 | 过滤能力 | 技术成熟度 |
+|------|------------|---------|---------|---------|-----------|
+| **onyx** | ✅ 极丰富 | ✅ RBAC | ✅ 完整 | ✅ 复杂查询 | ⭐⭐⭐⭐⭐（企业） |
+| **ragflow** | ✅ 丰富 | ✅ | ✅ | ✅ | ⭐⭐⭐⭐⭐ |
+| **kotaemon** | ✅ 中等 | 基础 | ✅ | ✅ | ⭐⭐⭐⭐ |
+| **Verba** | ✅ 中等 | 基础 | 无 | ✅ | ⭐⭐⭐⭐ |
+| **LightRAG** | 基础 | 无 | 无 | 基础 | ⭐⭐⭐ |
+| **RAG-Anything** | ✅ 丰富（多模态） | 无 | 基础 | ✅ | ⭐⭐⭐⭐ |
+| **SurfSense** | ✅ 网页特化 | 无 | ✅ 浏览器历史 | ✅ | ⭐⭐⭐⭐ |
+| **Self-Corrective-Agentic-RAG** | 基础 | 无 | 无 | 基础 | ⭐⭐⭐ |
+| **UltraRAG** | 基础 | 无 | 无 | 基础 | ⭐⭐ |
+
+<Callout type="warn" title="关键洞察">
+<ul>
+  <li><strong>最完整</strong>：onyx 的企业级元数据系统（RBAC + 版本 + 审计日志）</li>
+  <li><strong>最实用</strong>：ragflow 的文档元数据（来源/页码/置信度）</li>
+  <li><strong>最特化</strong>：SurfSense 的浏览器元数据（URL/访问时间/标签）</li>
+  <li><strong>趋势</strong>：从简单标签向结构化元数据 + 权限控制演进</li>
+</ul>
+</Callout>
+
+## 核心实现深度对比
+
+### 1. 基础元数据（最小可行方案）
+
+```python title="basic_metadata.py" path=null start=null
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+
+@dataclass
+class BasicMetadata:
+    """
+    基础元数据（最小可行方案）
+    
+    适用场景：
+    - 个人项目
+    - 原型验证
+    - 无复杂业务需求
+    """
+    # 必需字段
+    chunk_id: str
+    document_id: str
+    content: str
+    
+    # 来源信息
+    source_file: str
+    page: Optional[int] = None
+    
+    # 时间信息
+    created_at: datetime = None
+    
+    def __post_init__(self):
+        if self.created_at is None:
+            self.created_at = datetime.now()
+    
+    def to_dict(self) -> dict:
+        """转为字典（存储到向量数据库）"""
+        return {
+            "chunk_id": self.chunk_id,
+            "document_id": self.document_id,
+            "content": self.content,
+            "source_file": self.source_file,
+            "page": self.page,
+            "created_at": self.created_at.isoformat()
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> "BasicMetadata":
+        """从字典创建"""
+        data["created_at"] = datetime.fromisoformat(data["created_at"])
+        return cls(**data)
+
+# 使用示例
+metadata = BasicMetadata(
+    chunk_id="doc_1_chunk_5",
+    document_id="doc_1",
+    content="机器学习是...",
+    source_file="ml_intro.pdf",
+    page=5
+)
+
+# 存储到向量数据库
+vector_store.add(
+    vector=embedding,
+    metadata=metadata.to_dict()
+)
+
+# 检索时过滤
+results = vector_store.search(
+    query_vector=query_embedding,
+    filter={"source_file": "ml_intro.pdf"}  # 只搜索特定文件
+)
+```
+
+### 2. 企业级元数据（onyx 方案）
+
+```python title="enterprise_metadata.py" path=null start=null
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Optional, List, Dict
+import json
+
+class AccessLevel(Enum):
+    """访问级别"""
+    PUBLIC = 0
+    INTERNAL = 1
+    CONFIDENTIAL = 2
+    RESTRICTED = 3
+
+class DocumentStatus(Enum):
+    """文档状态"""
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+    DELETED = "deleted"
+
+@dataclass
+class EnterpriseMetadata:
+    """
+    企业级元数据
+    
+    特性：
+    - 权限控制（RBAC）
+    - 版本管理
+    - 审计日志
+    - 多维度标签
+    """
+    # 基础标识
+    chunk_id: str
+    document_id: str
+    content: str
+    
+    # 来源信息
+    source_file: str
+    source_type: str  # pdf / docx / webpage / email
+    page: Optional[int] = None
+    section: Optional[str] = None
+    
+    # 内容元数据
+    title: Optional[str] = None
+    author: Optional[str] = None
+    language: str = "en"
+    word_count: int = 0
+    
+    # 业务元数据
+    category: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
+    department: Optional[str] = None
+    project: Optional[str] = None
+    
+    # 权限元数据
+    owner: str = None
+    access_level: AccessLevel = AccessLevel.INTERNAL
+    allowed_groups: List[str] = field(default_factory=list)
+    allowed_users: List[str] = field(default_factory=list)
+    
+    # 版本元数据
+    version: str = "v1.0"
+    is_latest: bool = True
+    parent_version: Optional[str] = None
+    status: DocumentStatus = DocumentStatus.PUBLISHED
+    
+    # 时间元数据
+    created_at: datetime = None
+    updated_at: datetime = None
+    indexed_at: datetime = None
+    expires_at: Optional[datetime] = None
+    
+    # 质量元数据
+    confidence_score: float = 1.0
+    relevance_score: Optional[float] = None
+    
+    # 审计元数据
+    created_by: str = None
+    updated_by: str = None
+    index_method: str = "auto"
+    
+    # 扩展元数据（业务自定义）
+    custom_fields: Dict[str, any] = field(default_factory=dict)
+    
+    def __post_init__(self):
+        """初始化时间字段"""
+        now = datetime.now()
+        if self.created_at is None:
+            self.created_at = now
+        if self.updated_at is None:
+            self.updated_at = now
+        if self.indexed_at is None:
+            self.indexed_at = now
+    
+    def has_access(self, user_id: str, user_groups: List[str]) -> bool:
+        """
+        检查用户是否有访问权限
+        
+        Args:
+            user_id: 用户ID
+            user_groups: 用户所属组列表
+        
+        Returns:
+            True if user has access
+        """
+        # 1. 检查是否是 owner
+        if self.owner == user_id:
+            return True
+        
+        # 2. 检查用户是否在允许列表
+        if user_id in self.allowed_users:
+            return True
+        
+        # 3. 检查用户组是否在允许列表
+        if any(group in self.allowed_groups for group in user_groups):
+            return True
+        
+        # 4. PUBLIC 文档所有人可访问
+        if self.access_level == AccessLevel.PUBLIC:
+            return True
+        
+        return False
+    
+    def is_expired(self) -> bool:
+        """检查文档是否过期"""
+        if self.expires_at is None:
+            return False
+        return datetime.now() > self.expires_at
+    
+    def to_dict(self) -> dict:
+        """转为字典（存储）"""
+        return {
+            # 基础
+            "chunk_id": self.chunk_id,
+            "document_id": self.document_id,
+            "content": self.content,
+            
+            # 来源
+            "source_file": self.source_file,
+            "source_type": self.source_type,
+            "page": self.page,
+            "section": self.section,
+            
+            # 内容
+            "title": self.title,
+            "author": self.author,
+            "language": self.language,
+            "word_count": self.word_count,
+            
+            # 业务
+            "category": self.category,
+            "tags": self.tags,
+            "department": self.department,
+            "project": self.project,
+            
+            # 权限
+            "owner": self.owner,
+            "access_level": self.access_level.value,
+            "allowed_groups": self.allowed_groups,
+            "allowed_users": self.allowed_users,
+            
+            # 版本
+            "version": self.version,
+            "is_latest": self.is_latest,
+            "parent_version": self.parent_version,
+            "status": self.status.value,
+            
+            # 时间
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+            "indexed_at": self.indexed_at.isoformat(),
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            
+            # 质量
+            "confidence_score": self.confidence_score,
+            "relevance_score": self.relevance_score,
+            
+            # 审计
+            "created_by": self.created_by,
+            "updated_by": self.updated_by,
+            "index_method": self.index_method,
+            
+            # 自定义
+            "custom_fields": self.custom_fields
+        }
+    
+    def to_filter_dict(self) -> dict:
+        """
+        转为过滤条件字典（仅包含可过滤字段）
+        """
+        return {
+            "document_id": self.document_id,
+            "source_type": self.source_type,
+            "category": self.category,
+            "tags": self.tags,
+            "language": self.language,
+            "access_level": self.access_level.value,
+            "status": self.status.value,
+            "is_latest": self.is_latest
+        }
+
+# 使用示例
+
+# 创建企业级元数据
+metadata = EnterpriseMetadata(
+    chunk_id="doc_123_chunk_5",
+    document_id="doc_123",
+    content="机器学习是...",
+    source_file="ml_research.pdf",
+    source_type="pdf",
+    page=5,
+    title="Machine Learning Introduction",
+    author="Zhang San",
+    language="zh",
+    category="AI/Machine Learning",
+    tags=["ML", "AI", "Tutorial"],
+    department="Research",
+    owner="user_456",
+    access_level=AccessLevel.INTERNAL,
+    allowed_groups=["team_ai", "team_research"],
+    version="v1.0",
+    created_by="user_456"
+)
+
+# 权限检查
+user_has_access = metadata.has_access(
+    user_id="user_789",
+    user_groups=["team_ai"]
+)
+
+# 存储
+vector_store.add(
+    vector=embedding,
+    metadata=metadata.to_dict()
+)
+
+# 带权限过滤的检索
+results = vector_store.search(
+    query_vector=query_embedding,
+    filter={
+        "status": "published",
+        "is_latest": True,
+        "allowed_groups": {"$in": user_groups}
+    }
+)
+```
+
+### 3. 多模态元数据（RAG-Anything 方案）
+
+```python title="multimodal_metadata.py" path=null start=null
+from dataclasses import dataclass
+from typing import Optional, Dict, List
+from enum import Enum
+
+class ContentType(Enum):
+    """内容类型"""
+    TEXT = "text"
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+    TABLE = "table"
+    CODE = "code"
+
+@dataclass
+class MultimodalMetadata:
+    """
+    多模态元数据
+    
+    支持：
+    - 文本、图像、视频、音频
+    - 不同类型内容的特定元数据
+    """
+    # 基础
+    chunk_id: str
+    document_id: str
+    content_type: ContentType
+    
+    # 通用元数据
+    source_file: str
+    created_at: str
+    
+    # 文本特定元数据
+    text_content: Optional[str] = None
+    word_count: Optional[int] = None
+    language: Optional[str] = None
+    
+    # 图像特定元数据
+    image_path: Optional[str] = None
+    image_caption: Optional[str] = None
+    image_width: Optional[int] = None
+    image_height: Optional[int] = None
+    image_type: Optional[str] = None  # photo / chart / diagram / screenshot
+    
+    # 视频特定元数据
+    video_path: Optional[str] = None
+    video_duration: Optional[float] = None  # 秒
+    video_fps: Optional[float] = None
+    keyframe_timestamp: Optional[float] = None  # 关键帧时间戳
+    video_transcript: Optional[str] = None
+    
+    # 音频特定元数据
+    audio_path: Optional[str] = None
+    audio_duration: Optional[float] = None
+    audio_transcript: Optional[str] = None
+    audio_language: Optional[str] = None
+    
+    # 表格特定元数据
+    table_data: Optional[List[List[str]]] = None
+    table_headers: Optional[List[str]] = None
+    table_rows: Optional[int] = None
+    table_cols: Optional[int] = None
+    
+    # 代码特定元数据
+    code_content: Optional[str] = None
+    code_language: Optional[str] = None
+    code_line_start: Optional[int] = None
+    code_line_end: Optional[int] = None
+    
+    def to_dict(self) -> dict:
+        """转为字典"""
+        base = {
+            "chunk_id": self.chunk_id,
+            "document_id": self.document_id,
+            "content_type": self.content_type.value,
+            "source_file": self.source_file,
+            "created_at": self.created_at
+        }
+        
+        # 根据类型添加特定字段
+        if self.content_type == ContentType.TEXT:
+            base.update({
+                "text_content": self.text_content,
+                "word_count": self.word_count,
+                "language": self.language
+            })
+        
+        elif self.content_type == ContentType.IMAGE:
+            base.update({
+                "image_path": self.image_path,
+                "image_caption": self.image_caption,
+                "image_width": self.image_width,
+                "image_height": self.image_height,
+                "image_type": self.image_type
+            })
+        
+        elif self.content_type == ContentType.VIDEO:
+            base.update({
+                "video_path": self.video_path,
+                "video_duration": self.video_duration,
+                "video_fps": self.video_fps,
+                "keyframe_timestamp": self.keyframe_timestamp,
+                "video_transcript": self.video_transcript
+            })
+        
+        elif self.content_type == ContentType.AUDIO:
+            base.update({
+                "audio_path": self.audio_path,
+                "audio_duration": self.audio_duration,
+                "audio_transcript": self.audio_transcript,
+                "audio_language": self.audio_language
+            })
+        
+        elif self.content_type == ContentType.TABLE:
+            base.update({
+                "table_data": self.table_data,
+                "table_headers": self.table_headers,
+                "table_rows": self.table_rows,
+                "table_cols": self.table_cols
+            })
+        
+        elif self.content_type == ContentType.CODE:
+            base.update({
+                "code_content": self.code_content,
+                "code_language": self.code_language,
+                "code_line_start": self.code_line_start,
+                "code_line_end": self.code_line_end
+            })
+        
+        return base
+
+# 使用示例
+
+# 文本 chunk
+text_metadata = MultimodalMetadata(
+    chunk_id="text_1",
+    document_id="doc_1",
+    content_type=ContentType.TEXT,
+    source_file="paper.pdf",
+    created_at="2024-01-15",
+    text_content="机器学习是...",
+    word_count=237,
+    language="zh"
+)
+
+# 图像 chunk
+image_metadata = MultimodalMetadata(
+    chunk_id="image_1",
+    document_id="doc_1",
+    content_type=ContentType.IMAGE,
+    source_file="paper.pdf",
+    created_at="2024-01-15",
+    image_path="/images/figure_1.png",
+    image_caption="CNN architecture diagram",
+    image_width=1920,
+    image_height=1080,
+    image_type="diagram"
+)
+
+# 视频 chunk（关键帧）
+video_metadata = MultimodalMetadata(
+    chunk_id="video_1_frame_10",
+    document_id="video_1",
+    content_type=ContentType.VIDEO,
+    source_file="lecture.mp4",
+    created_at="2024-01-15",
+    video_path="/videos/lecture.mp4",
+    video_duration=3600.0,
+    video_fps=30.0,
+    keyframe_timestamp=300.0,  # 5分钟处的关键帧
+    video_transcript="In this section, we discuss..."
+)
+```
+
+## 高级元数据策略
+
+### 1. 版本管理
+
+```python title="version_management.py" path=null start=null
+class DocumentVersionManager:
+    """
+    文档版本管理器
+    
+    功能：
+    - 追踪文档历史版本
+    - 总是使用最新版本
+    - 支持回滚
+    """
+    
+    def __init__(self, vector_store):
+        self.vector_store = vector_store
+    
+    def add_document_version(
+        self,
+        document_id: str,
+        content: str,
+        version: str,
+        updated_by: str
+    ):
+        """
+        添加新版本
+        
+        策略：
+        1. 标记旧版本为 is_latest=False
+        2. 添加新版本 is_latest=True
+        3. 记录父版本
+        """
+        # 1. 查找当前最新版本
+        current_version = self.vector_store.search(
+            filter={
+                "document_id": document_id,
+                "is_latest": True
+            }
+        )
+        
+        # 2. 标记旧版本
+        if current_version:
+            for old_doc in current_version:
+                self.vector_store.update(
+                    id=old_doc["id"],
+                    metadata={"is_latest": False}
+                )
+        
+        # 3. 添加新版本
+        new_metadata = {
+            "document_id": document_id,
+            "version": version,
+            "is_latest": True,
+            "parent_version": current_version[0]["version"] if current_version else None,
+            "updated_by": updated_by,
+            "updated_at": datetime.now().isoformat()
+        }
+        
+        # 生成 embedding 并添加
+        embedding = self.generate_embedding(content)
+        self.vector_store.add(
+            vector=embedding,
+            metadata=new_metadata
+        )
+    
+    def get_latest_version(self, document_id: str):
+        """获取最新版本"""
+        results = self.vector_store.search(
+            filter={
+                "document_id": document_id,
+                "is_latest": True
+            }
+        )
+        return results[0] if results else None
+    
+    def get_version_history(self, document_id: str) -> List[dict]:
+        """获取版本历史"""
+        results = self.vector_store.search(
+            filter={"document_id": document_id}
+        )
+        # 按版本排序
+        return sorted(results, key=lambda x: x["metadata"]["updated_at"], reverse=True)
+    
+    def rollback_to_version(self, document_id: str, target_version: str):
+        """回滚到指定版本"""
+        # 1. 标记所有版本为非最新
+        all_versions = self.get_version_history(document_id)
+        for version in all_versions:
+            self.vector_store.update(
+                id=version["id"],
+                metadata={"is_latest": False}
+            )
+        
+        # 2. 标记目标版本为最新
+        target = [v for v in all_versions if v["metadata"]["version"] == target_version][0]
+        self.vector_store.update(
+            id=target["id"],
+            metadata={"is_latest": True}
+        )
+```
+
+### 2. 智能标签系统
+
+```python title="smart_tagging.py" path=null start=null
+class SmartTaggingSystem:
+    """
+    智能标签系统
+    
+    功能：
+    - 自动生成标签
+    - 标签层级结构
+    - 标签推荐
+    """
+    
+    def __init__(self, llm_client):
+        self.llm = llm_client
+        self.tag_hierarchy = self._init_tag_hierarchy()
+    
+    def _init_tag_hierarchy(self) -> Dict:
+        """初始化标签层级"""
+        return {
+            "Technology": {
+                "AI": ["Machine Learning", "Deep Learning", "NLP", "Computer Vision"],
+                "Web": ["Frontend", "Backend", "DevOps"],
+                "Mobile": ["iOS", "Android", "React Native"]
+            },
+            "Business": {
+                "Finance": ["Accounting", "Investment", "Tax"],
+                "Marketing": ["SEO", "Social Media", "Content Marketing"]
+            },
+            "Science": {
+                "Physics": ["Quantum", "Classical"],
+                "Biology": ["Genetics", "Ecology"]
+            }
+        }
+    
+    async def auto_tag(self, content: str, max_tags: int = 5) -> List[str]:
+        """
+        自动生成标签
+        
+        策略：
+        1. 用 LLM 提取关键主题
+        2. 匹配到标签层级
+        3. 返回最相关的标签
+        """
+        prompt = f"""Extract up to {max_tags} relevant tags from the following text.
+
+Text: {content[:500]}
+
+Available tags:
+{self._format_tag_hierarchy()}
+
+Output only the tags, one per line.
+"""
+        
+        response = await self.llm.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3
+        )
+        
+        tags = response.choices[0].message.content.strip().split("\n")
+        return [tag.strip() for tag in tags if tag.strip()]
+    
+    def _format_tag_hierarchy(self) -> str:
+        """格式化标签层级（用于提示词）"""
+        lines = []
+        for category, subcategories in self.tag_hierarchy.items():
+            lines.append(f"- {category}")
+            for subcat, tags in subcategories.items():
+                lines.append(f"  - {subcat}: {', '.join(tags)}")
+        return "\n".join(lines)
+    
+    def recommend_tags(self, existing_tags: List[str]) -> List[str]:
+        """
+        推荐相关标签
+        
+        策略：找到同一类别下的其他标签
+        """
+        recommendations = []
+        
+        for category, subcategories in self.tag_hierarchy.items():
+            for subcat, tags in subcategories.items():
+                # 如果已有标签在这个子类别中
+                if any(tag in tags for tag in existing_tags):
+                    # 推荐同子类别的其他标签
+                    recommendations.extend([t for t in tags if t not in existing_tags])
+        
+        return recommendations[:5]
+
+# 使用示例
+tagging_system = SmartTaggingSystem(llm_client)
+
+content = "这篇文章介绍了深度学习在计算机视觉中的应用..."
+tags = await tagging_system.auto_tag(content)
+# Output: ["AI", "Deep Learning", "Computer Vision"]
+
+# 推荐相关标签
+recommended = tagging_system.recommend_tags(tags)
+# Output: ["Machine Learning", "NLP"]
+```
+
+### 3. 元数据验证与清理
+
+```python title="metadata_validation.py" path=null start=null
+from pydantic import BaseModel, validator, Field
+from datetime import datetime
+from typing import Optional, List
+
+class MetadataSchema(BaseModel):
+    """
+    元数据验证模式（使用 Pydantic）
+    
+    优势：
+    - 类型检查
+    - 数据验证
+    - 自动文档生成
+    """
+    chunk_id: str = Field(..., min_length=1, max_length=100)
+    document_id: str = Field(..., min_length=1, max_length=100)
+    content: str = Field(..., min_length=1)
+    
+    source_file: str
+    page: Optional[int] = Field(None, ge=1)
+    
+    category: Optional[str] = Field(None, max_length=50)
+    tags: List[str] = Field(default_factory=list, max_items=10)
+    
+    language: str = Field("en", regex="^[a-z]{2}$")  # ISO 639-1
+    word_count: int = Field(0, ge=0)
+    
+    created_at: datetime
+    confidence_score: float = Field(1.0, ge=0.0, le=1.0)
+    
+    @validator("tags")
+    def validate_tags(cls, v):
+        """验证标签（去重、转小写）"""
+        return list(set(tag.lower() for tag in v))
+    
+    @validator("source_file")
+    def validate_source_file(cls, v):
+        """验证文件路径"""
+        if not v.endswith(('.pdf', '.docx', '.txt', '.md')):
+            raise ValueError("Unsupported file type")
+        return v
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+# 使用示例
+
+# 有效元数据
+valid_metadata = MetadataSchema(
+    chunk_id="doc_1_chunk_1",
+    document_id="doc_1",
+    content="Some text...",
+    source_file="document.pdf",
+    page=5,
+    tags=["AI", "ML", "AI"],  # 会自动去重
+    language="zh",
+    word_count=100,
+    created_at=datetime.now()
+)
+
+# 无效元数据（会抛出验证错误）
+try:
+    invalid_metadata = MetadataSchema(
+        chunk_id="",  # 太短
+        document_id="doc_1",
+        content="Text",
+        source_file="file.unknown",  # 不支持的格式
+        page=-1,  # 负数
+        created_at=datetime.now()
+    )
+except ValueError as e:
+    print(f"Validation error: {e}")
+```
+
+## 元数据查询语言
+
+### 复杂过滤示例
+
+```python title="advanced_filtering.py" path=null start=null
+# Qdrant 风格的复杂查询
+
+# 1. AND 查询
+filter = {
+    "must": [
+        {"key": "category", "match": {"value": "AI"}},
+        {"key": "language", "match": {"value": "zh"}},
+        {"key": "is_latest", "match": {"value": True}}
+    ]
+}
+
+# 2. OR 查询
+filter = {
+    "should": [
+        {"key": "tags", "match": {"any": ["ML", "DL"]}},
+        {"key": "category", "match": {"value": "AI"}}
+    ]
+}
+
+# 3. 范围查询
+filter = {
+    "must": [
+        {"key": "created_at", "range": {
+            "gte": "2024-01-01",
+            "lte": "2024-12-31"
+        }},
+        {"key": "confidence_score", "range": {
+            "gte": 0.8
+        }}
+    ]
+}
+
+# 4. 嵌套查询
+filter = {
+    "must": [
+        {"key": "status", "match": {"value": "published"}},
+        {
+            "should": [
+                {"key": "access_level", "match": {"value": 0}},  # PUBLIC
+                {"key": "allowed_groups", "match": {"any": user_groups}}
+            ]
+        }
+    ]
+}
+
+# 5. NOT 查询
+filter = {
+    "must": [
+        {"key": "is_latest", "match": {"value": True}}
+    ],
+    "must_not": [
+        {"key": "status", "match": {"value": "archived"}},
+        {"key": "tags", "match": {"any": ["deprecated", "obsolete"]}}
+    ]
+}
+```
+
+## 最佳实践
+
+<Cards>
+  <Card title="元数据设计" href="#design">
+    <ul>
+      <li>最小化原则：只存储必要字段</li>
+      <li>一致性：同类文档统一模式</li>
+      <li>可查询性：常用过滤字段建索引</li>
+      <li>扩展性：预留自定义字段</li>
+    </ul>
+  </Card>
+  
+  <Card title="权限控制" href="#access">
+    <ul>
+      <li>分层权限：PUBLIC/INTERNAL/CONFIDENTIAL</li>
+      <li>基于组：而非单个用户</li>
+      <li>最小权限原则</li>
+      <li>审计日志：记录访问历史</li>
+    </ul>
+  </Card>
+  
+  <Card title="版本管理" href="#version">
+    <ul>
+      <li>总是标记 is_latest</li>
+      <li>记录 parent_version</li>
+      <li>支持版本回滚</li>
+      <li>定期清理旧版本</li>
+    </ul>
+  </Card>
+  
+  <Card title="元数据清理" href="#cleanup">
+    <ul>
+      <li>定期去重</li>
+      <li>删除过期文档</li>
+      <li>归档旧版本</li>
+      <li>验证数据完整性</li>
+    </ul>
+  </Card>
+</Cards>
+
+## 常见问题
+
+**Q: 元数据会影响检索性能吗？**
+A: 会。过多或未索引的元数据字段会降低过滤速度。建议：1) 只对常用字段建索引 2) 使用向量数据库的原生过滤（如 Qdrant）而非后处理过滤
+
+**Q: 如何处理元数据模式变更？**
+A: 使用版本化元数据模式 + 迁移脚本。存储 `metadata_schema_version` 字段，兼容旧版本数据
+
+**Q: 多语言元数据如何处理？**
+A: 1) 存储原始语言 + 翻译 2) 使用 `language` 字段过滤 3) 多语言标签用 `tags_en` / `tags_zh` 分开
+
+## 延伸阅读
+
+- [如何提高 RAG 性能](/docs/advanced-rag-deep-dive/how-to-improve-rag-performance) - 包含元数据优化章节
+- [构建高质量的 RAG 系统](/docs/advanced-rag-deep-dive/building-high-quality-rag-systems) - 元数据策略
+
+## 参考文献
+
+- Qdrant Filters Docs - 结构化过滤与布尔查询
+- Elasticsearch ECS - 元数据与日志结构化参考
+- 企业级合规/审计最佳实践（GDPR/SOC2）
+
+**完成！**Phase 2 所有文档已完成。下一阶段进入应用场景实战。

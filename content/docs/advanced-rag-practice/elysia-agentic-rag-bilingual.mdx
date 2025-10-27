@@ -1,0 +1,257 @@
+---
+title: "[Weaviate] Elysia: Building an end-to-end agentic RAG app / 使用 Elysia 构建端到端的智能体 RAG 应用"
+description: Learn how to build end-to-end agentic RAG applications using Weaviate's open-source framework Elysia, enabling dynamic decision-making, data visualization, and transparent AI interaction experiences. / 了解如何使用 Weaviate 的开源框架 Elysia 构建端到端的智能体 RAG 应用，实现动态决策、数据可视化和透明的 AI 交互体验。
+---
+
+# Elysia: Building an end-to-end agentic RAG app / 使用 Elysia 构建端到端的智能体 RAG 应用
+
+In a world where AI chatbots are increasingly common, most still suffer from the same limitation: they're text in, text out. But what if your AI could dynamically decide not just what to say, but how to show it? What if it could learn from your preferences, intelligently categorize, label, and search through your data, and provide complete transparency into its decision-making process?
+
+在 AI 聊天机器人日益普及的世界中，大多数仍存在相同的局限性：它们只是文本输入，文本输出。但如果您的 AI 能够动态决定不仅说什么，而且如何展示呢？如果它能够学习您的偏好，智能地分类、标记和搜索您的数据，并提供其决策过程的完全透明度呢？
+
+Enter [Elysia](https://github.com/weaviate/elysia) – our open-source, agentic RAG framework that represents a fundamental rethink of how we interact with our data through AI.
+
+Elysia 是 Weaviate 开发的开源智能体 RAG 框架，它代表了我们通过 AI 与数据交互方式的根本性重新思考。
+
+![Elysia: Building an end-to-end agentic RAG app](/images/elysia-agentic-rag/hero-8ea5c4230dc233c3105f8dccf5387ad5.png)
+
+## Introduction: What is Elysia? / Elysia 简介
+
+Elysia is a decision tree based agentic system which intelligently decides what tools to use, what results have been obtained, whether it should continue the process or whether its goal has been completed. It offers both a **full frontend interface** and an easily **pip-installable** **Python package**.
+
+Elysia 是一个基于决策树的智能体系统，能够智能地决定使用什么工具、获得了什么结果、是否应该继续流程或是否已完成目标。它提供了完整的前端界面和易于安装的 Python 包。
+
+Out of the box, the Elysia app can connect to your [Weaviate cluster](https://console.weaviate.cloud/) and perform smart searches - automatically generating unique filters and search parameters based on just natural language from the user - and display the results dynamically on the frontend.
+
+开箱即用，Elysia 应用可以连接到您的 [Weaviate 集群](https://console.weaviate.cloud/) 并执行智能搜索 - 基于用户的自然语言自动生成唯一的过滤器和搜索参数 - 并在前端动态显示结果。
+
+The entire project is open source and designed with customization in mind. You can use it as-is, for effective searching of your data, or you can install the python package and easily create tools to use Elysia for whatever purposes you need an agentic AI for.
+
+整个项目是开源的，设计时考虑了可定制性。您可以按原样使用它来有效搜索您的数据，或者您可以安装 python 包并轻松创建工具，将 Elysia 用于您需要智能体 AI 的任何目的。
+
+## How Does It Work? / 工作原理
+
+Elysia is architectured as a modern web application with a full-featured frontend for a responsive, real-time interface and a FastAPI backend serving both the web interface and API. The core logic is written in pure Python – what we call "blood, sweat, and tears" custom logic – with [DSPy](https://docs.weaviate.io/integrations/llm-agent-frameworks/dspy) handling LLM interactions for flexible, future-proof implementations.
+
+Elysia 架构为一个现代 Web 应用程序，具有全功能前端，可提供响应式实时界面，以及为 Web 界面和 API 服务的 FastAPI 后端。核心逻辑用纯 Python 编写，我们称之为"血汗泪水"自定义逻辑，而 DSPy 处理 LLM 交互以实现灵活、面向未来的实现。
+
+We've aimed to make [getting started](https://weaviate.io/blog/elysia-agentic-rag#getting-started) as easy as possible - everything comes in a single pip-installable package. To use Elysia as an app, you need a [Weaviate Cloud](https://console.weaviate.cloud/) instance with your data. Once installed with `pip install elysia-ai`, you can either run the full web interface with `elysia start` or use it as a Python library by importing it and initializing the tree object for programmatic queries.
+
+Elysia 的设计使入门尽可能简单 - 所有内容都包含在一个可 pip 安装的包中。要将 Elysia 用作应用程序，您需要一个包含数据的 Weaviate Cloud 实例。安装后使用 `pip install elysia-ai`，您可以运行完整的 Web 界面 `elysia start` 或将其用作 Python 库，通过导入并初始化树对象进行编程查询。
+
+```bash
+pip install elysia-ai
+elysia start
+```
+
+To get started in the web application, simply head over to the "Settings" tab to create your first config, add your Weaviate Cluster details and your chosen model provider and keys, give it a name, and click save. Then, you can go to the "Data" tab to analyze your collections, and tada! Agentic RAG ready to go. Users are also able to create multiple configs that allow you to switch between data clusters or model providers easily.
+
+要开始使用 Web 应用程序，只需转到"设置"选项卡创建您的第一个配置，添加您的 Weaviate 集群详细信息和您选择的模型提供商和密钥，给它一个名称，然后点击保存。然后，您可以转到"数据"选项卡分析您的集合，瞧！智能体 RAG 已准备就绪。用户还可以创建多个配置，以便在数据集群或模型提供商之间轻松切换。
+
+Behind the scenes of this pretty web app and easy-to-use python library, there's actually quite a bit going on. Mainly, there are three components of Elysia's design that we haven't seen combined in **any other** open source agentic framework: a customizable decision-tree architecture, dynamic data display types, and AI data analysis and awareness.
+
+在这个漂亮的 Web 应用和易用的 python 库背后，实际上有很多工作正在进行。主要是，Elysia 设计中有三个组件，我们在任何其他开源智能体框架中都没有看到它们的结合：可定制的决策树架构、动态数据显示类型和 AI 数据分析和意识。
+
+![Elysia architecture](/images/elysia-agentic-rag/architecture-diagram-58c560f782cadc2f190ca955dc06cffb.png)
+
+## The Three Pillars of Elysia / Elysia 的三大支柱
+
+### 1. Customizable Decision Tree Architecture / 1. 可定制的决策树架构
+
+Elysia's decision tree architecture is what makes it truly agentic. Rather than following a fixed pipeline, Elysia dynamically decides what tools to use, when to use them, and how to respond based on both the user's query and the results of previous steps. Each node in the tree represents a decision point where the agent can choose from multiple possible actions.
+
+Elysia 的决策树架构使其真正成为智能体。Elysia 不是遵循固定管道，而是动态决定使用什么工具、何时使用它们以及如何基于用户查询和先前步骤的结果进行响应。树中的每个节点代表一个决策点，智能体可以在多个可能的操作中选择。
+
+The tree structure is fully customizable, allowing developers to define their own decision points and actions. This means you can tailor Elysia's behavior to your specific use case, whether that's a customer service chatbot, a research assistant, or a data analysis tool.
+
+树结构是完全可定制的，允许开发人员定义自己的决策点和操作。这意味着您可以根据特定用例定制 Elysia 的行为，无论是客户服务聊天机器人、研究助手还是数据分析工具。
+
+What makes this particularly powerful is that the decision-making process is completely transparent. Users can view the entire decision tree in real-time, seeing exactly how Elysia arrived at its response. This transparency is crucial for building trust in AI systems and for debugging when things go wrong.
+
+特别强大的是决策过程是完全透明的。用户可以实时查看整个决策树，准确看到 Elysia 是如何得出其响应的。这种透明度对于建立对 AI 系统的信任以及在出现问题时进行调试至关重要。
+
+### 2. Dynamic Data Display Types / 2. 动态数据显示类型
+
+Most RAG applications simply return text results, but Elysia can dynamically choose how to display information based on both the data type and the user's intent. This means that instead of just getting a wall of text, users might see:
+
+大多数 RAG 应用程序只是返回文本结果，但 Elysia 可以基于数据类型和用户意图动态选择如何显示信息。这意味着用户不会只得到一堵文字墙，而是可能看到：
+
+- Interactive charts for numerical data
+- Image galleries for visual content
+- Structured tables for tabular information
+- Maps for location-based data
+- Timelines for chronological information
+
+- 数值数据的交互式图表
+- 视觉内容的图像库
+- 表格信息的结构化表格
+- 基于位置数据的地图
+- 时间信息的时间线
+
+This dynamic display selection is handled by a specialized "display type" system that analyzes both the retrieved data and the user's query to determine the most appropriate visualization.
+
+这种动态显示选择由专门的"显示类型"系统处理，该系统分析检索到的数据和用户查询以确定最合适的可视化。
+
+### 3. AI Data Analysis and Awareness / 3. AI 数据分析和意识
+
+Elysia doesn't just retrieve data - it actively analyzes and understands it. When you connect a data source to Elysia, it automatically generates metadata about the collection, including:
+
+Elysia 不仅检索数据 - 它还主动分析和理解数据。当您将数据源连接到 Elysia 时，它会自动生成关于集合的元数据，包括：
+
+- Property descriptions for each field
+- Dataset summaries
+- Example queries
+- Recommended display types
+
+- 每个字段的属性描述
+- 数据集摘要
+- 示例查询
+- 推荐的显示类型
+
+This analysis happens automatically when you first connect a data source, but Elysia can also continuously learn and improve its understanding over time. This means that the more you use Elysia, the better it becomes at understanding your data and providing relevant results.
+
+当您首次连接数据源时，此分析会自动发生，但 Elysia 也可以随着时间的推移不断学习和改进其理解。这意味着您使用 Elysia 越多，它就越能更好地理解您的数据并提供相关结果。
+
+## Real World Example: Glowe Skincare / 现实世界示例：Glowe 护肤应用
+
+In order to test whether Elysia actually worked as a flexible agentic framework the way we envisioned it, we decided to use it to power the chat interface in our AI-powered skincare ecommerce app, [Glowe](https://weaviate.io/blog/glowe-app).
+
+为了测试 Elysia 是否按我们设想的方式作为灵活的智能体框架工作，我们决定使用它为我们的 AI 驱动的护肤电商应用 Glowe 提供聊天界面。
+
+![Glowe built with Elysia](/images/elysia-agentic-rag/glowe-elysia-752f28b4348ea99f20a0a62c5abc2699.png)
+
+For the Glowe-Elysia tree, we created three custom tools specifically for the app's needs:
+
+对于 Glowe-Elysia 树，我们为应用的需求创建了三个自定义工具：
+
+1. A query agent tool for finding the right products with complex filters (powered by the [Weaviate Query Agent](https://docs.weaviate.io/agents/query))
+2. A stack generation tool that creates product collections specific to a user through natural language
+3. A similar products tool that provides recommendations based on the current context and individual user
+
+1. 用于通过复杂过滤器查找合适产品的查询代理工具（由 [Weaviate 查询代理](https://docs.weaviate.io/agents/query) 提供支持）
+2. 通过自然语言为用户创建产品集合的堆栈生成工具
+3. 基于当前上下文和单个用户提供推荐的类似产品工具
+
+All the complex functionality – text responses, recursion, self-healing, error handling, and streaming – came built-in with Elysia. We could focus entirely on implementing the logic specific to the app, rather than building all the boring AI infrastructure.
+
+所有复杂功能 - 文本响应、递归、自我修复、错误处理和流式传输 - 都随 Elysia 内置提供。我们可以完全专注于实现应用特定的逻辑，而不是构建所有无聊的 AI 基础设施。
+
+## Getting Started / 入门指南
+
+Getting up and running with Elysia requires minimal setup. Here's a step by step:
+
+使用 Elysia 运行需要最少的设置。以下是分步指南：
+
+### Web app / Web 应用
+
+#### **Step 1: Install dependencies and start app / 步骤 1：安装依赖并启动应用**
+
+Run these commands to launch the web interface
+
+运行这些命令启动 Web 界面
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install elysia-ai
+elysia start
+```
+
+#### **Step 2: Get some data / 步骤 2：获取一些数据**
+
+If you don't already have a Weaviate Cloud cluster with some data in it, head over to the [Weaviate Cloud console](https://console.weaviate.cloud/) and [create a free Sandbox cluster](https://docs.weaviate.io/cloud/quickstart#11-create-a-cluster).
+
+如果您还没有包含数据的 Weaviate Cloud 集群，请前往 [Weaviate Cloud 控制台](https://console.weaviate.cloud/) 并 [创建一个免费的沙盒集群](https://docs.weaviate.io/cloud/quickstart#11-create-a-cluster)。
+
+Then, you can either add data to your cluster by following [the quickstart tutorial](https://docs.weaviate.io/weaviate/quickstart) or by coping this prompt into your favorite vibe coding LLM chat.
+
+然后，您可以通过遵循 [快速入门教程](https://docs.weaviate.io/weaviate/quickstart) 或将其复制到您最喜欢的 vibe 编码 LLM 聊天中来向集群添加数据。
+
+#### **Step 3: Add your configuration settings / 步骤 3：添加您的配置设置**
+
+In the config editor, you can add your Weaviate Cluster URL and API key and set your models and model provider API keys. You can also create multiple configs that allow you to switch between data clusters or model providers easily.
+
+在配置编辑器中，您可以添加您的 Weaviate 集群 URL 和 API 密钥，并设置您的模型和模型提供商 API 密钥。您还可以创建多个配置，以便在数据集群或模型提供商之间轻松切换。
+
+![Elysia app config](/images/elysia-agentic-rag/config-7c9fcdd9bdcfde92c4235ad4f5cd169b.png)
+
+In the left menu bar, you can also [customize your very own blob](https://weaviate.io/blog/elysia-agentic-rag#customize-your-blob)!
+
+在左侧菜单栏中，您还可以 [自定义您自己的 blob](https://weaviate.io/blog/elysia-agentic-rag#customize-your-blob)！
+
+#### **Step 4: Analyze your data / 步骤 4：分析您的数据**
+
+Under the `Data` tab in the menu bar on the left hand side, you can analyze your collections, which will prompt an LLM to generate property descriptions, a dataset summary, example queries and select display types for each collection.
+
+在左侧菜单栏的 `数据` 选项卡下，您可以分析您的集合，这将提示 LLM 为每个集合生成属性描述、数据集摘要、示例查询和选择显示类型。
+
+When you click on a data source, you can view all the items in the collection and edit any of the metadata, including choosing additional display types or configuring the property mappings.
+
+当您点击数据源时，您可以查看集合中的所有项目并编辑任何元数据，包括选择其他显示类型或配置属性映射。
+
+#### **Step 5: Start chatting / 步骤 5：开始聊天**
+
+It's time to start asking questions! Head over to the `Chat` tab to create a new conversation and chat with your data. If you want to view the decision tree, click the green button on the top left of the chat view to switch to the tree view, and hover over any of the nodes to get the description of the node, instructions for the LLM, and then LLM's reasoning. Each new user query will generate a new decision tree within this view.
+
+是时候开始提问了！前往 `聊天` 选项卡创建新对话并与您的数据聊天。如果您想查看决策树，请点击聊天视图左上角的绿色按钮切换到树视图，将鼠标悬停在任何节点上以获取节点描述、LLM 的指令，然后是 LLM 的推理。每个新的用户查询都会在此视图中生成新的决策树。
+
+![Elysia app chat](/images/elysia-agentic-rag/chat-0d78666bb863b8ae6afe1c2ab21ef06e.png)
+
+Settings are also configurable on a per chat level. You can add more detailed Agent instructions, or change up your model settings.
+
+设置也可以在每个聊天级别进行配置。您可以添加更详细的代理指令，或更改模型设置。
+
+### As a Python Library / 作为 Python 库
+
+Simply install with:
+
+只需安装：
+
+```bash
+pip install elysia-ai
+```
+
+And then in Python, using Elysia is as easy as:
+
+然后在 Python 中，使用 Elysia 非常简单：
+
+```python
+from elysia import tree, preprocess
+preprocess("<your_collection_name>")
+tree = Tree()
+tree("What is Elysia?")
+```
+
+Using Elysia requires access to LLMs and your Weaviate cloud details, which can be set in your local environment file or configuring directly in Python. The [full documentation](https://weaviate.github.io/elysia/) provides detailed configuration options and examples.
+
+使用 Elysia 需要访问 LLM 和您的 Weaviate 云详细信息，这些可以在您的本地环境文件中设置或直接在 Python 中配置。[完整文档](https://weaviate.github.io/elysia/) 提供了详细的配置选项和示例。
+
+## What's Next? / 下一步计划
+
+We're still cooking 🧑‍🍳
+
+我们仍在开发中。
+
+We've got several features planned and in progress, including custom theming similar to Verba that will allow users to match Elysia's appearance to their brand. But beyond that, you'll have to wait and see 👀
+
+我们有几个计划中和进行中的功能，包括类似于 Verba 的自定义主题，这将允许用户将 Elysia 的外观与他们的品牌匹配。但除此之外，您必须等待看看 👀
+
+## Conclusion: The Future of Agentic RAG / 结论：智能体 RAG 的未来
+
+Elysia is more than just another RAG implementation - we built it to show a new approach to what AI applications can be. By combining transparent agent decision-making, dynamic displays, and over-time personalization and optimization, we think we're on track to creating an AI assistant that understand not just what you're asking, but how to actually present the answer effectively.
+
+Elysia 不仅仅是另一个 RAG 实现 - 我们构建它是为了展示 AI 应用程序的新方法。通过结合透明的代理决策、动态显示以及随时间推移的个性化和优化，我们认为我们正在创建一个不仅理解您在问什么，而且理解如何有效呈现答案的 AI 助手。
+
+Elysia is eventually going to replace Verba, our original RAG application, as our next step developing cutting-edge applications with vector databases as their core. Going beyond simple Ask-Retrieve-Generate pipelines, we've created an infrastructure for developing sophisticated, agentic AI applications while keeping the developer and user experiences simple and straightforward.
+
+Elysia 最终将取代 Verba，这是我们使用向量数据库作为核心开发前沿应用的下一步。超越简单的询问-检索-生成管道，我们创建了一个基础设施，用于开发复杂的智能体 AI 应用程序，同时保持开发人员和用户体验的简单直接。
+
+Whether you're building an e-commerce chatbot, a internal company knowledge expert, or something entirely new, Elysia provides the foundation for AI experiences that extend beyond just text generation. We can't wait to see what you build!
+
+无论您是在构建电商聊天机器人、内部公司知识专家，还是全新的东西，Elysia 都为超越文本生成的 AI 体验提供了基础。我们迫不及待地想看看您会构建什么！
+
+So, ready to get started? Visit the [demo](https://elysia.weaviate.io/), check out the [GitHub repository](https://github.com/weaviate/elysia), or dive into the [documentation](https://weaviate.github.io/elysia/) to start building.
+
+那么，准备好开始了吗？访问 [演示](https://elysia.weaviate.io/)，查看 [GitHub 仓库](https://github.com/weaviate/elysia)，或深入 [文档](https://weaviate.github.io/elysia/) 开始构建。
+
+![Team picture](/images/elysia-agentic-rag/team-0b5603b7887d27a520cf7f88a3b8ae35.png)

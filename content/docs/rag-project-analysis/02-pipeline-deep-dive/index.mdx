@@ -1,0 +1,17 @@
+---
+title: 02 Pipeline 节点深度剖析
+description: 围绕解析/分块/嵌入/检索/生成/存储六大节点的实现要点与最佳实践
+---
+
+# 02 Pipeline 节点深度剖析
+
+聚焦六大节点，沉淀跨项目的共性实现与差异：
+
+- 文档解析（Document Parsing）：格式支持、结构保持、错误恢复
+- 分块（Chunking）：规则/语义/LLM 分块，完整案例与参数选择
+- 嵌入（Embedding）：模型选型、微调、动态嵌入与刷新策略
+- 检索（Retrieval）：混合检索、查询重写、RRF 重排、多向量检索
+- 生成（Generation）：上下文组装、提示压缩、引用与证据
+- 存储（Storage）：JSON/键值、向量库、图数据库与混合架构
+
+参考文献：RAGSolutions 中的各节点分析与 Master Reference 交叉验证。

@@ -1,0 +1,464 @@
+---
+title: "[PostgreSQL] 使用 PostgreSQL 和 pgvector 进行混合搜索"
+description: 学习如何在 PostgreSQL 中使用 pgvector 实现混合搜索，结合向量相似性搜索和全文搜索来提升 RAG 系统的召回率
+---
+
+# Hybrid search with PostgreSQL and pgvector
+# 使用 PostgreSQL 和 pgvector 进行混合搜索
+
+*   Mon, Sep 16, 2024
+*   14-minute read
+*   2024年9月16日
+*   14分钟阅读
+
+A key metric when evaluating vector similarity search algorithms is "[recall](https://en.wikipedia.org/wiki/Precision_and_recall)" - which measures the relevancy of the returned search results. Typically better recall means better quality search results, but this is often at the cost of another key metric, such as index size or query latency. This has led to different techniques to "boost" recall while trying to limited any adverse impact to other metrics. There are a variety of techniques available for this, such as using different storage and search strategies to overcompensate for a key metric tradeoff. For example, quantization techniques can cause information loss when reducing the size of a vector, but using statistical quantization can help improve results in some cases.
+
+评估向量相似性搜索算法时的一个关键指标是"[召回率](https://en.wikipedia.org/wiki/Precision_and_recall)"——它衡量返回搜索结果的相关性。通常更好的召回率意味着更好的搜索结果质量，但这往往以另一个关键指标为代价，比如索引大小或查询延迟。这导致了不同的技术来"提升"召回率，同时尽量减少对其他指标的不利影响。有多种技术可以实现这一点，比如使用不同的存储和搜索策略来过度补偿关键指标的权衡。例如，量化技术在减小向量大小时可能导致信息丢失，但使用统计量化可以在某些情况下帮助改善结果。
+
+One technique used to boost recall is "hybrid search." Hybrid search is the act of combining an alternative searching method with a vector similarity search. This blog post will introduce what hybrid search is and how to use it with [PostgreSQL](https://www.postgresql.org/) and [pgvector](https://github.com/pgvector/pgvector/). In a future post, I plan to demonstrate the impact of hybrid search on the five key vector search metrics (index build time, index size, recall, query latency, QPS), but I haven't seen or established a [ground truth](https://en.wikipedia.org/wiki/Ground_truth) set that can help establish that benchmark.
+
+提升召回率的一种技术是"混合搜索"。混合搜索是将另一种搜索方法与向量相似性搜索相结合的行为。这篇博客文章将介绍什么是混合搜索，以及如何在[PostgreSQL](https://www.postgresql.org/)和[pgvector](https://github.com/pgvector/pgvector/)中使用它。在未来的文章中，我计划演示混合搜索对五个关键向量搜索指标（索引构建时间、索引大小、召回率、查询延迟、QPS）的影响，但我还没有看到或建立一个可以帮助建立该基准的[真实数据集](https://en.wikipedia.org/wiki/Ground_truth)。
+
+## What is hybrid search?
+## 什么是混合搜索？
+
+As mentioned above, in the context of vector search, "hybrid search" is the act of combining an alternative searching method with a vector similarity search. Hybrid search uses multiple search methods over the same data, performs a ranking of the results for each search method, and then combines all the results to determine a final ranking before returning the results. Hybrid search is often used to improve the quality of the returned results, or in other words, boost the "recall" rate.
+
+如上所述，在向量搜索的上下文中，"混合搜索"是将另一种搜索方法与向量相似性搜索相结合的行为。混合搜索对相同数据使用多种搜索方法，对每种搜索方法的结果进行排名，然后组合所有结果以确定最终排名，再返回结果。混合搜索通常用于提高返回结果的质量，换句话说，就是提升"召回率"。
+
+There are a variety of methods used to score the results, with [reciprocal ranked fusion](https://en.wikipedia.org/wiki/Mean_reciprocal_rank) (RRF) being very popular. For ranked your search results (e.g., 1, 2, 3), RRF provides a weighted scoring system that lets you define how much a higher-ranked item (1 is ranked higher than 2) counts towards the final score. You can control weighting using a constant typically referred to as `k`, though this can be understandably confusing given vector similarity search uses `k` to mean "k-nearest neighbor". For this blog post, we'll call it `rrf_k`. To calculate RRF for a hybrid search with two different search methods, you'd use the below formula:
+
+有多种方法用于对结果进行评分，其中[倒数排名融合](https://en.wikipedia.org/wiki/Mean_reciprocal_rank)（RRF）非常流行。对于排名的搜索结果（例如，1、2、3），RRF提供了一个加权评分系统，让您定义排名较高的项目（1比2排名高）对最终分数的贡献程度。您可以使用一个通常称为`k`的常数来控制权重，尽管这可能会令人困惑，因为向量相似性搜索使用`k`表示"k近邻"。在这篇博客文章中，我们称之为`rrf_k`。要计算两种不同搜索方法的混合搜索的RRF，您将使用以下公式：
+
+```
+1.0 / (result_search_1_rank + rrf_k) +
+1.0 / (result_search_2_rank + rrf_k)
+```
+
+where `result_search_1_rank` is the rank of the result in the first search, and `result_search_2_rank` is the rank of the result from the second search. If a result doesn't appear in a search, we can return `0` for the score. Below is an example function for calculating an individual RRF score, which we'll use through the blog post:
+
+其中`result_search_1_rank`是第一个搜索中结果的排名，`result_search_2_rank`是第二个搜索中结果的排名。如果结果没有出现在某个搜索中，我们可以返回`0`作为分数。下面是一个计算单个RRF分数的示例函数，我们将在整篇博客文章中使用：
+
+```sql
+CREATE OR REPLACE FUNCTION rrf_score(rank bigint, rrf_k int DEFAULT 50)
+RETURNS numeric
+LANGUAGE SQL
+IMMUTABLE PARALLEL SAFE
+AS $$
+    SELECT COALESCE(1.0 / ($1 + $2), 0.0);
+$$;
+```
+
+A smaller value of `rrf_k` gives more weight to higher ranked items, whereas a larger value of `rrf_k` gives more weight to lower ranked items. For hybrid search, this impacts the final score when combining the two scores from the search. Below is an example that shows how `rrf_k` impacts the final score on items that have a ranking of 1 to 10; we see how increasing `rrf_k` decreases how much weight a higher ranked score has on the results.
+
+较小的`rrf_k`值会给排名较高的项目更多权重，而较大的`rrf_k`值会给排名较低的项目更多权重。对于混合搜索，这会影响组合搜索的两个分数时的最终分数。下面是一个示例，展示了`rrf_k`如何影响排名1到10的项目的最终分数；我们可以看到增加`rrf_k`会减少排名较高的分数对结果的权重。
+
+```sql
+SELECT
+    results.rrf_k,
+    array_agg(results.score) scores
+FROM (
+    SELECT
+        rrf_k,
+        round(100 * rrf_score(rank, rrf_k), 2) score
+    FROM generate_series(10, 100, 10) rrf_k,
+        generate_series(1,10) rank
+    ORDER BY rrf_k, rank
+) results
+GROUP BY results.rrf_k
+ORDER BY results.rrf_k;
+```
+
+which yields:
+
+结果如下：
+
+```
+rrf_k |                       scores                        
+-------+-----------------------------------------------------
+    10 | {9.09,8.33,7.69,7.14,6.67,6.25,5.88,5.56,5.26,5.00}
+    20 | {4.76,4.55,4.35,4.17,4.00,3.85,3.70,3.57,3.45,3.33}
+    30 | {3.23,3.13,3.03,2.94,2.86,2.78,2.70,2.63,2.56,2.50}
+    40 | {2.44,2.38,2.33,2.27,2.22,2.17,2.13,2.08,2.04,2.00}
+    50 | {1.96,1.92,1.89,1.85,1.82,1.79,1.75,1.72,1.69,1.67}
+    60 | {1.64,1.61,1.59,1.56,1.54,1.52,1.49,1.47,1.45,1.43}
+    70 | {1.41,1.39,1.37,1.35,1.33,1.32,1.30,1.28,1.27,1.25}
+    80 | {1.23,1.22,1.20,1.19,1.18,1.16,1.15,1.14,1.12,1.11}
+    90 | {1.10,1.09,1.08,1.06,1.05,1.04,1.03,1.02,1.01,1.00}
+   100 | {0.99,0.98,0.97,0.96,0.95,0.94,0.93,0.93,0.92,0.91}
+```
+
+Our `rrf_score` function defaults to using `50`; you may want to adjust this based your search methods and embedding models (I realize this is a generic statement; a future blog will dive deeper into this topic).
+
+我们的`rrf_score`函数默认使用`50`；您可能需要根据您的搜索方法和嵌入模型来调整这个值（我意识到这是一个通用的陈述；未来的博客将更深入地探讨这个话题）。
+
+With generative AI use cases, including [retrieval augmented generation](https://aws.amazon.com/what-is/retrieval-augmented-generation/) ([RAG](https://aws.amazon.com/what-is/retrieval-augmented-generation/)), "hybrid search" typically refers to combining vector similarity search with full-text search, given the vector output of many embedding models is based on a text source. Before exploring an example of hybrid search, we'll first learn how we can use full-text search in PostgreSQL.
+
+在生成式AI用例中，包括[检索增强生成](https://aws.amazon.com/what-is/retrieval-augmented-generation/)（[RAG](https://aws.amazon.com/what-is/retrieval-augmented-generation/)），"混合搜索"通常指将向量相似性搜索与全文搜索相结合，因为许多嵌入模型的向量输出基于文本源。在探索混合搜索的示例之前，我们将首先学习如何在PostgreSQL中使用全文搜索。
+
+## Full-text search in PostgreSQL
+## PostgreSQL中的全文搜索
+
+[PostgreSQL includes several full-text search methods](https://www.postgresql.org/docs/current/textsearch.html), including [tsearch2](https://www.postgresql.org/docs/current/textsearch.html) and [pg_trgm](https://www.postgresql.org/docs/current/pgtrgm.html). Additionally, there are a variety of extensions for PostgreSQL that implement full-text search, including [pg_bigm](https://github.com/pgbigm/pg_bigm), [PGroonga](https://pgroonga.github.io/), [ZomboDB](https://github.com/zombodb/zombodb), [pg_search](https://www.paradedb.com/blog/introducing_search) (based on BM25), and more (please be sure you ensure an extension's license works for your use case). For the built-in PostgreSQL full-text search methods, there are [two types of indexing methods available](https://www.postgresql.org/docs/current/textsearch-indexes.html): GIN (generalized inverted index) which provides an inverted index search, and GiST (generalized search tree).
+
+[PostgreSQL包含几种全文搜索方法](https://www.postgresql.org/docs/current/textsearch.html)，包括[tsearch2](https://www.postgresql.org/docs/current/textsearch.html)和[pg_trgm](https://www.postgresql.org/docs/current/pgtrgm.html)。此外，还有多种PostgreSQL扩展实现了全文搜索，包括[pg_bigm](https://github.com/pgbigm/pg_bigm)、[PGroonga](https://pgroonga.github.io/)、[ZomboDB](https://github.com/zombodb/zombodb)、[pg_search](https://www.paradedb.com/blog/introducing_search)（基于BM25）等（请确保扩展的许可证适用于您的用例）。对于内置的PostgreSQL全文搜索方法，有[两种可用的索引方法](https://www.postgresql.org/docs/current/textsearch-indexes.html)：GIN（广义倒排索引）提供倒排索引搜索，以及GiST（广义搜索树）。
+
+Full-text search in PostgreSQL is a multi-part topic unto itself – in fact, I attended a presentation at [PGDay.UK 2024](https://2024.pgday.uk/) on this exact topic! For this blog post, we're going to use tsearch2 with the GIN index and the `ts_rank_cd` result ranking method. For more information, please see the [PostgreSQL full-text search documentation](https://www.postgresql.org/docs/current/textsearch.html).
+
+PostgreSQL中的全文搜索本身就是一个多部分的话题——事实上，我在[PGDay.UK 2024](https://2024.pgday.uk/)上参加了关于这个确切话题的演讲！对于这篇博客文章，我们将使用tsearch2配合GIN索引和`ts_rank_cd`结果排名方法。更多信息，请参见[PostgreSQL全文搜索文档](https://www.postgresql.org/docs/current/textsearch.html)。
+
+With that, let's see how we can implement hybrid search in PostgreSQL.
+
+有了这些，让我们看看如何在PostgreSQL中实现混合搜索。
+
+## Example: building hybrid search in PostgreSQL with full-text search and vector search with pgvector
+## 示例：在PostgreSQL中使用全文搜索和pgvector向量搜索构建混合搜索
+
+For this example, I wanted to try to build something out that's real-worldish. However, I ended generated a bunch of random text data using the Python [`faker`](https://faker.readthedocs.io/en/master/) library, and then computed a vector using the [`multi-qa-MiniLM-L6-cos-v1`](https://huggingface.co/sentence-transformers/multi-qa-MiniLM-L6-cos-v1) sentence transformer model. I don't particularly like the fact this example is built on "garbage" data that I generated, but as we'll see, it turned out that using hybrid search actually worked and boosted the expected top result to the number one position!
+
+对于这个示例，我想尝试构建一些接近现实世界的东西。然而，我最终使用Python的[`faker`](https://faker.readthedocs.io/en/master/)库生成了一堆随机文本数据，然后使用[`multi-qa-MiniLM-L6-cos-v1`](https://huggingface.co/sentence-transformers/multi-qa-MiniLM-L6-cos-v1)句子变换模型计算了向量。我不太喜欢这个示例建立在我生成的"垃圾"数据上，但正如我们将看到的，使用混合搜索实际上有效，并将预期的顶级结果提升到了第一名！
+
+For this example, you'll need a PostgreSQL database with pgvector (at least version v0.5; I used v0.7.4) and Python with a few libraries:
+
+对于这个示例，您需要一个安装了pgvector的PostgreSQL数据库（至少版本v0.5；我使用的是v0.7.4）和带有一些库的Python：
+
+*   [`psycopg`](https://www.psycopg.org/psycopg3/)
+*   [`pgvector`](https://github.com/pgvector/pgvector-python)
+*   [`faker`](https://faker.readthedocs.io/en/master/)
+*   [`sentence_transformers`](https://pypi.org/project/sentence-transformers/)
+
+Here is the schema for the example:
+
+示例的模式如下：
+
+```sql
+-- create the extension
+CREATE EXTENSION vector;
+
+-- create the schema
+CREATE TABLE products (
+	id int GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+	description text NOT NULL,
+	embedding vector(384) NOT NULL
+);
+-- helper function for calculating the score
+CREATE OR REPLACE FUNCTION rrf_score(rank int, rrf_k int DEFAULT 50)
+RETURNS numeric
+LANGUAGE SQL
+IMMUTABLE PARALLEL SAFE
+AS $$
+    SELECT COALESCE(1.0 / ($1 + $2), 0.0);
+$$ ;
+```
+
+```python
+from faker import Faker
+import psycopg
+from pgvector.psycopg import register_vector
+from sentence_transformers import SentenceTransformer
+
+# generate random (garbage?) data
+fake = Faker()
+sentences = [fake.sentence(nb_words=50) for i in range(0,50_000)]
+
+# generate the vector embedding - this may take a few minutes
+model = SentenceTransformer('multi-qa-MiniLM-L6-cos-v1')
+embeddings = model.encode(sentences)
+
+# load the data into the database
+conn = psycopg.connect(dbname="<YOUR DATABASE>", autocommit=True) # fill in with your details
+cur = conn.cursor()
+
+with cur.copy("COPY products (description, embedding) FROM STDIN WITH (FORMAT BINARY)") as copy:
+	copy.set_types(["text", "vector"])
+	for content, embedding in zip(sentences, embeddings):
+		copy.write_row((content, embedding))
+
+cur.close()
+conn.close()
+```
+
+To complete our setup, we'll create the indexes. While we could have created the indexes on an empty table, this will let us build the indexes more quickly:
+
+为了完成我们的设置，我们将创建索引。虽然我们可以在空表上创建索引，但这将让我们更快地构建索引：
+
+```sql
+-- create the full-text search index
+CREATE INDEX ON products
+    USING GIN (to_tsvector('english', description));
+-- create the vector search index (HNSW)
+CREATE INDEX ON products
+    USING hnsw(embedding vector_cosine_ops) WITH (ef_construction=256);
+```
+
+Let's note two things here. First, notice that the product description is stored as `text`, but the GIN index uses an expression `to_tsvector('english', description)`. The expression index enables us to store the data encoded for full-text search only in the index, instead of having it additionally as a separate column in the table. Additionally, note that we have to specify the dictionary (in this case, `english`) in the function call: we need to use immutable functions in expression indexes, and this ensures that we always use the same dictionary when creating the index.
+
+这里要注意两点。首先，注意产品描述存储为`text`，但GIN索引使用表达式`to_tsvector('english', description)`。表达式索引使我们能够仅在索引中存储为全文搜索编码的数据，而不是在表中额外作为一个单独的列。此外，注意我们必须在函数调用中指定词典（在这种情况下是`english`）：我们需要在表达式索引中使用不可变函数，这确保了我们在创建索引时总是使用相同的词典。
+
+Now let's perform some searches. First, I'll demonstrate how the search work individually, so we can then see how a hybrid search "boosts" our results. In this example, I'll search for a `travel computer` (which in my randomly generated garbage data, I saw that phrase come up a few times, and I happened to be traveling and working on my computer while building out this example). This is how I generated the vector that embedded `travel computer`:
+
+现在让我们执行一些搜索。首先，我将演示搜索如何单独工作，这样我们就可以看到混合搜索如何"提升"我们的结果。在这个示例中，我将搜索`travel computer`（在我随机生成的垃圾数据中，我看到这个短语出现了几次，而且我恰好在旅行时构建这个示例并在我的电脑上工作）。这是我生成嵌入`travel computer`的向量的方法：
+
+```python
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer('multi-qa-MiniLM-L6-cos-v1')
+embedding = model.encode('travel computer')
+```
+
+First, let's run the query using a vector similarity search. The vector embedding is represented as `$1` in the below query:
+
+首先，让我们使用向量相似性搜索运行查询。向量嵌入在下面的查询中表示为`$1`：
+
+```sql
+SELECT id, description, rank() OVER (ORDER BY $1 <=> embedding) AS rank
+FROM products
+ORDER BY $1 <=> embedding
+LIMIT 10
+```
+
+In my dataset, I had the following results (clipped for brevity):
+
+在我的数据集中，我有以下结果（为简洁起见进行了剪裁）：
+
+```
+id   | description             | rank 
+-------+-------------------------+-------
+ 10578 | ... travel ... computer |    1
+ 20763 | ... computer ...        |    2
+ 20894 | ... computer ...        |    3
+   838 | Computer ...            |    4
+ 11045 | ...computer ...         |    5
+ 18548 | ... travel computer ... |    6
+ 16564 | ... computer ...        |    7
+ 20402 | ...computer ...         |    8
+ 10346 | ... computer ...        |    9
+ 11243 | ... travel ... computer |   10
+```
+
+I'm not going to overanalyze this given all my disclaimers about the data, but it seems like record that should rank the highest (`18548`) is actually ranked sixth. Let's see what a full-text search produces:
+
+鉴于我对数据的所有免责声明，我不会过度分析这一点，但看起来应该排名最高的记录（`18548`）实际上排名第六。让我们看看全文搜索会产生什么结果：
+
+```sql
+SELECT
+    id,
+    description,
+    rank() OVER (ORDER BY ts_rank_cd(to_tsvector(description), plainto_tsquery('travel computer')) DESC) AS rank
+FROM products
+WHERE
+    plainto_tsquery('english', 'travel computer') @@ to_tsvector('english', description)
+ORDER BY rank
+LIMIT 10;
+```
+
+which in my dataset, yielded:
+
+在我的数据集中，结果如下：
+
+```
+id   | description                 | rank 
+-------+-----------------------------+------
+ 18548 | ... travel computer ...     |    1
+  7372 | ... travel computer ...     |    1
+ 49374 | ... travel computer ...     |    1
+ 39214 | ... travel computer ...     |    1
+ 12875 | ... computer travel ...     |    1
+  3712 | ... travel computer ...     |    1
+ 24719 | ... travel ... computer ... |    7
+ 31607 | ... travel ... computer ... |    7
+ 13674 | ... travel ... computer ... |    7
+ 42755 | ... computer ... travel ... |    7
+```
+
+We can see that the full-text search scoring function ranked `18548` as the top result, along with 6 other entries. This also gives insight into where hybrid search can help us: while a vector similarity search can help us determine the semantic relationship of a search phrase, the phrase itself may not necessarily be present in the search. And while a full-text search can determine if the search phrase is present in the text, it may not determine its overall relevancy across the entire content. Combining the two methods may help us to boost the results.
+
+我们可以看到全文搜索评分函数将`18548`排在首位，还有其他6个条目。这也让我们了解到混合搜索可以在哪里帮助我们：虽然向量相似性搜索可以帮助我们确定搜索短语的语义关系，但短语本身不一定出现在搜索中。而虽然全文搜索可以确定搜索短语是否存在于文本中，但它可能无法确定其在整个内容中的整体相关性。结合这两种方法可能有助于提升结果。
+
+The below query will let us perform a hybrid search. We'll target `10` results in this search, but this means we'll have to search over more results to ensure we have enough overlapping results to compare. For this case, I chose `40`, mainly because the default for `hnsw.ef_search` is 40. To perform our hybrid search, we'll set up two subqueries: one that performs the vector search, the other that performs the full-text search. Then, in the outer query, we'll use our `rrf_score` function (with `rrf_k` set to the default of `50`) to sum up the results, and order by the highest score. The search vector is represented by `$1`:
+
+下面的查询将让我们执行混合搜索。我们将在这次搜索中目标`10`个结果，但这意味着我们必须搜索更多结果以确保有足够的重叠结果进行比较。对于这种情况，我选择了`40`，主要是因为`hnsw.ef_search`的默认值是40。为了执行我们的混合搜索，我们将设置两个子查询：一个执行向量搜索，另一个执行全文搜索。然后，在外层查询中，我们将使用我们的`rrf_score`函数（`rrf_k`设置为默认值`50`）来汇总结果，并按最高分数排序。搜索向量由`$1`表示：
+
+```sql
+SELECT
+    searches.id,
+    searches.description,
+    sum(rrf_score(searches.rank)) AS score
+FROM (
+	(
+		SELECT
+            id,
+            description,
+            rank() OVER (ORDER BY $1 <=> embedding) AS rank
+		FROM products
+		ORDER BY $1 <=> embedding
+		LIMIT 40
+	)
+	UNION ALL
+	(
+		SELECT
+			id,
+            description,
+			rank() OVER (ORDER BY ts_rank_cd(to_tsvector(description), plainto_tsquery('travel computer')) DESC) AS rank
+		FROM products
+		WHERE
+			plainto_tsquery('english', 'travel computer') @@ to_tsvector('english', description)
+		ORDER BY rank
+		LIMIT 40
+	)
+) searches
+GROUP BY searches.id, searches.description
+ORDER BY score DESC
+LIMIT 10;
+```
+
+which yields the following result:
+
+结果如下：
+
+```
+id   | description                 |         score          
+-------+-----------------------------+------------------------
+ 18548 | ... travel computer ...     | 0.03746498599439775910
+  7372 | ... travel computer ...     | 0.01960784313725490196
+ 12875 | ... computer travel ...     | 0.01960784313725490196
+ 10578 | ... travel ... computer ... | 0.01960784313725490196
+ 39214 | ... travel computer ...     | 0.01960784313725490196
+ 49374 | ... travel computer ...     | 0.01960784313725490196
+  3712 | ... travel computer ...     | 0.01960784313725490196
+ 20763 | ... computer ...            | 0.01923076923076923077
+ 20894 | ... computer ...            | 0.01886792452830188679
+   838 | Computer ...                | 0.01851851851851851852
+```
+
+We can see that in our hybrid search, `18548` has the top RRF score; the other entries that contained "travel computer" tied for 2nd, followed by three of the top 10 semantic search results rounding out the list. Again, I wouldn't read too much into this given the dataset, but it seems like a hybrid search method has the potential to boost the recall of our result set.
+
+我们可以看到在我们的混合搜索中，`18548`具有最高的RRF分数；包含"travel computer"的其他条目并列第二，接着是排名前10的语义搜索结果中的三个完成了列表。再次强调，鉴于数据集，我不会对此过度解读，但这似乎表明混合搜索方法有潜力提升我们结果集的召回率。
+
+SQL queries like the one above can seem a bit hard to understand at first, so let's briefly break down how it works. I've found the trick to understanding SQL is to work from the inside-out: start from the innermost part of the query and move to the outside.
+
+像上面这样的SQL查询一开始可能有点难以理解，所以让我们简要分解一下它是如何工作的。我发现理解SQL的技巧是从内到外：从查询的最内层开始，然后向外移动。
+
+In our hybrid search query, first we have the two subqueries that we saw before - the vector search query…
+
+在我们的混合搜索查询中，首先我们有之前看到的两个子查询——向量搜索查询…
+
+```sql
+SELECT
+    id,
+    description,
+    rank() OVER (ORDER BY $1 <=> embedding) AS rank
+FROM products
+ORDER BY $1 <=> embedding
+LIMIT 40
+```
+
+and the full-text search query:
+
+和全文搜索查询：
+
+```sql
+SELECT
+    id,
+    description,
+    rank() OVER (ORDER BY ts_rank_cd(to_tsvector(description), plainto_tsquery('travel computer')) DESC) AS rank
+FROM products
+WHERE
+    plainto_tsquery('english', 'travel computer') @@ to_tsvector('english', description)
+ORDER BY rank
+LIMIT 40
+```
+
+Each of these queries returns 40 results. We now need a way to combine them, which is what [`UNION ALL`](https://www.postgresql.org/docs/current/queries-union.html) does:
+
+这些查询每个都返回40个结果。我们现在需要一种方法来组合它们，这就是[`UNION ALL`](https://www.postgresql.org/docs/current/queries-union.html)的作用：
+
+```sql
+(
+    SELECT
+        id,
+        description,
+        rank() OVER (ORDER BY $1 <=> embedding) AS rank
+    FROM products
+    ORDER BY $1 <=> embedding
+    LIMIT 40
+)
+UNION ALL
+(
+    SELECT
+        id,
+        description,
+        rank() OVER (ORDER BY ts_rank_cd(to_tsvector(description), plainto_tsquery('travel computer')) DESC) AS rank
+    FROM products
+    WHERE
+        plainto_tsquery('english', 'travel computer') @@ to_tsvector('english', description)
+    ORDER BY rank
+    LIMIT 40
+)
+```
+
+Now that we've combined the two queries, we need to calculate the final score. To do this, we first give our subquery a name - we'll call it `searches` (`FROM ( ... ) searches`). We then figure out how we're going to combine or aggregate our results. Recall that `rrf_score` has the ability to handle `NULL` data (`COALESCE(1.0 / ($1 + $2), 0.0)`). This lets us use the `sum` aggregate function to combine results: if a row is found in both subqueries, its scores will be added up, and if a row is only present in one search, its score will be added to `0`. Finally, we have to group by our "unique" identifiers (the row ID and its description), order the results starting with the top score (`ORDER BY score DESC`), and limit our results to `10`. The abbreviated example of this query is below:
+
+现在我们已经组合了两个查询，我们需要计算最终分数。为此，我们首先给子查询一个名字——我们称之为`searches`（`FROM ( ... ) searches`）。然后我们确定如何组合或聚合我们的结果。回想一下，`rrf_score`有能力处理`NULL`数据（`COALESCE(1.0 / ($1 + $2), 0.0)`）。这让我们可以使用`sum`聚合函数来组合结果：如果一行在两个子查询中都找到，它的分数将被加起来，如果一行只出现在一个搜索中，它的分数将被加到`0`。最后，我们必须按我们的"唯一"标识符（行ID和其描述）分组，按结果从最高分数开始排序（`ORDER BY score DESC`），并将结果限制为`10`。这个查询的简化示例如下：
+
+```sql
+SELECT
+    searches.id,
+    searches.description,
+    sum(rrf_score(searches.rank)) AS score
+FROM (
+    -- UNION'd queries
+) searches
+GROUP BY searches.id, searches.description
+ORDER BY score DESC
+LIMIT 10;
+```
+
+How about performance? As I mentioned at the top of the blog post, I can't do a rigorous performance analysis here due to the lack of a ground-truth dataset, and this is only a dataset of 50K rows. That said, I'm happy to show the [`EXPLAIN`](https://www.postgresql.org/docs/current/sql-explain.html) plan that was generated. Below is the output of `EXPLAIN ANALYZE` on this query to show that both indexes were used:
+
+性能如何？正如我在博客文章开头提到的，由于缺乏真实数据集，我无法在这里进行严格的性能分析，而这只是一个5万行的数据集。话虽如此，我很乐意展示生成的[`EXPLAIN`](https://www.postgresql.org/docs/current/sql-explain.html)计划。下面是此查询的`EXPLAIN ANALYZE`输出，以显示使用了两个索引：
+
+```
+Limit  (cost=789.66..789.69 rows=10 width=365) (actual time=8.516..8.519 rows=10 loops=1)
+   ->  Sort  (cost=789.66..789.86 rows=80 width=365) (actual time=8.515..8.518 rows=10 loops=1)
+         Sort Key: (sum(COALESCE((1.0 / (("*SELECT* 1".rank + 50))::numeric), 0.0))) DESC
+         Sort Method: top-N heapsort  Memory: 32kB
+         ->  GroupAggregate  (cost=785.53..787.93 rows=80 width=365) (actual time=8.435..8.495 rows=79 loops=1)
+               Group Key: "*SELECT* 1".id, "*SELECT* 1".description
+               ->  Sort  (cost=785.53..785.73 rows=80 width=341) (actual time=8.430..8.436 rows=80 loops=1)
+                     Sort Key: "*SELECT* 1".id, "*SELECT* 1".description
+                     Sort Method: quicksort  Memory: 53kB
+                     ->  Append  (cost=84.60..783.00 rows=80 width=341) (actual time=0.877..8.414 rows=80 loops=1)
+                           ->  Subquery Scan on "*SELECT* 1"  (cost=84.60..125.52 rows=40 width=341) (actual time=0.877..0.949 rows=40 loops=1)
+                                 ->  Limit  (cost=84.60..125.12 rows=40 width=349) (actual time=0.876..0.945 rows=40 loops=1)
+                                       ->  WindowAgg  (cost=84.60..50736.60 rows=50000 width=349) (actual time=0.876..0.942 rows=40 loops=1)
+                                             ->  Index Scan using products_embeddings_hnsw_idx on products  (cost=84.60..49861.60 rows=50000 width=341) (actual time=0.872..0.919 rows=40 loops=1)
+                                                   Order By: (embedding <=> '<redacted>'::vector)
+                           ->  Subquery Scan on "*SELECT* 2"  (cost=656.58..657.08 rows=40 width=341) (actual time=7.448..7.458 rows=40 loops=1)
+                                 ->  Limit  (cost=656.58..656.68 rows=40 width=345) (actual time=7.447..7.453 rows=40 loops=1)
+                                       ->  Sort  (cost=656.58..656.89 rows=124 width=345) (actual time=7.447..7.449 rows=40 loops=1)
+                                             Sort Key: (rank() OVER (?))
+                                             Sort Method: top-N heapsort  Memory: 44kB
+                                             ->  WindowAgg  (cost=588.18..652.66 rows=124 width=345) (actual time=7.357..7.419 rows=139 loops=1)
+                                                   ->  Sort  (cost=588.18..588.49 rows=124 width=337) (actual time=7.355..7.363 rows=139 loops=1)
+                                                         Sort Key: (ts_rank_cd(to_tsvector(products_1.description), plainto_tsquery('travel computer'::text))) DESC
+                                                         Sort Method: quicksort  Memory: 79kB
+                                                         ->  Bitmap Heap Scan on products products_1  (cost=30.38..583.87 rows=124 width=337) (actual time=0.271..7.323 rows=139 loops=1)
+                                                               Recheck Cond: ('''travel'' & ''comput'''::tsquery @@ to_tsvector('english'::regconfig, description))
+                                                               Heap Blocks: exact=138
+                                                               ->  Bitmap Index Scan on products_description_gin_idx  (cost=0.00..30.35 rows=124 width=0) (actual time=0.186..0.186 rows=139 loops=1)
+                                                                     Index Cond: (to_tsvector('english'::regconfig, description) @@ '''travel'' & ''comput'''::tsquery)
+ Planning Time: 0.193 ms
+ Execution Time: 8.553 ms
+```
+
+So yes, PostgreSQL used the indexes in both subqueries. I left the execution time in the output, though it doesn't really mean much given this dataset is so small.
+
+是的，PostgreSQL在两个子查询中都使用了索引。我在输出中保留了执行时间，尽管鉴于这个数据集如此小，它并没有什么实际意义。
+
+## Next steps
+## 下一步
+
+The main goal of this blog post was to show how you can use PostgreSQL and pgvector with hybrid search. This answers the "can you" perform hybrid search question, but it doesn't attempt to answer "should you" - that requires a lot more analysis, and it's analysis I'm planning to do in a future post. For next steps, I'd like to evaluate if hybrid search can provide a recall boost over just performing vector similarity search over a known dataset, and if so, what are the key metric tradeoffs. Additionally, it'd be good to analyze different full-text search algorithms with PostgreSQL and if/how they can help with boosting result relevancy.
+
+这篇博客文章的主要目标是展示如何在PostgreSQL和pgvector中使用混合搜索。这回答了"能否"执行混合搜索的问题，但没有尝试回答"是否应该"——这需要更多的分析，我计划在未来的文章中进行分析。下一步，我想评估混合搜索是否能提供比仅在已知数据集上执行向量相似性搜索更好的召回率提升，如果是，关键指标的权衡是什么。此外，分析PostgreSQL中不同的全文搜索算法以及它们是否/如何帮助提升结果相关性也是很好的。

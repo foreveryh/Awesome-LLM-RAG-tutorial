@@ -1,0 +1,499 @@
+---
+title: "[Elasticsearch] Reciprocal Rank Fusion (RRF) 详解"
+description: 了解 Elasticsearch 中的 Reciprocal Rank Fusion (RRF) 技术，包括加权 RRF 和混合检索应用。Learn about Reciprocal Rank Fusion (RRF) in Elasticsearch, including weighted RRF and hybrid retrieval applications.
+---
+
+# Reciprocal Rank Fusion (RRF) 详解
+# Understanding Reciprocal Rank Fusion (RRF) in Detail
+
+Reciprocal Rank Fusion (RRF) 是一种将多个具有不同相关性指标的结果集组合成单个结果集的方法。RRF 不需要调优，不同的相关性指标不必相互关联即可获得高质量的结果。
+
+Reciprocal Rank Fusion (RRF) is a method for combining multiple result sets with different relevance indicators into a single result set. RRF requires no tuning, and the different relevance indicators do not have to be related to each other to achieve high-quality results.
+
+## RRF 工作原理
+## How RRF Works
+
+RRF 使用以下公式来确定每个文档的排名分数：
+
+RRF uses the following formula to determine the score for ranking each document:
+
+```
+score = 0.0
+for q in queries:
+    if d in result(q):
+        score += 1.0 / ( k + rank( result(q), d ) )
+return score
+```
+
+其中：
+- k 是排名常数
+- q 是查询集合中的一个查询
+- d 是结果集中的一个文档
+- result(q) 是查询 q 的结果集
+- rank( result(q), d ) 是文档 d 在结果集 result(q) 中的排名（从 1 开始）
+
+Where:
+- k is a ranking constant
+- q is a query in the set of queries
+- d is a document in the result set of q
+- result(q) is the result set of q
+- rank( result(q), d ) is d's rank within the result(q) starting from 1
+
+## RRF API 使用方法
+## Using the RRF API
+
+您可以使用 RRF 作为搜索的一部分，通过 RRF 检索器将来自多个子检索器的独立结果集组合和排名。至少需要两个子检索器才能进行排名。
+
+You can use RRF as part of a search to combine and rank documents using separate sets of top documents (result sets) from a combination of child retrievers using an RRF retriever. A minimum of two child retrievers is required for ranking.
+
+RRF 检索器是搜索请求的 retriever 参数中定义的可选对象。RRF 检索器对象包含以下参数：
+
+An RRF retriever is an optional object defined as part of a search request's retriever parameter. The RRF retriever object contains the following parameters:
+
+### 参数说明
+### Parameter Description
+
+**retrievers** (必需, 检索器对象数组)
+指定将应用 RRF 公式的返回顶部文档的子检索器列表。每个子检索器在 RRF 公式中具有相等的权重。需要两个或更多子检索器。
+
+(Required, array of retriever objects)
+A list of child retrievers to specify which sets of returned top documents will have the RRF formula applied to them. Each child retriever carries an equal weight as part of the RRF formula. Two or more child retrievers are required.
+
+**rank_constant** (可选, 整数)
+此值确定单个查询的结果集中的文档对最终排名结果集的影响程度。较高的值表示排名较低的文档具有更大的影响。此值必须大于或等于 1。默认值为 60。
+
+(Optional, integer)
+This value determines how much influence documents in individual result sets per query have over the final ranked result set. A higher value indicates that lower ranked documents have more influence. This value must be greater than or equal to 1. Defaults to 60.
+
+**rank_window_size** (可选, 整数)
+此值确定单个查询的结果集大小。较高的值会以性能为代价提高结果相关性。最终排名的结果集会被修剪为搜索请求的大小。rank_window_size 必须大于或等于 size 且大于或等于 1。默认为 size 参数。
+
+(Optional, integer)
+This value determines the size of the individual result sets per query. A higher value will improve result relevance at the cost of performance. The final ranked result set is pruned down to the search request's size. rank_window_size must be greater than or equal to size and greater than or equal to 1. Defaults to the size parameter.
+
+## RRF 使用示例
+## RRF Usage Examples
+
+### 基本 RRF 示例
+### Basic RRF Example
+
+以下示例展示了如何使用 RRF 检索器组合标准检索器和 kNN 检索器：
+
+The following example shows how to use an RRF retriever to combine a standard retriever and a kNN retriever:
+
+```json
+GET example-index/_search
+{
+    "retriever": {
+        "rrf": {
+            "retrievers": [
+                {
+                    "standard": {
+                        "query": {
+                            "term": {
+                                "text": "shoes"
+                            }
+                        }
+                    }
+                },
+                {
+                    "knn": {
+                        "field": "vector",
+                        "query_vector": [1.25, 2, 3.5],
+                        "k": 50,
+                        "num_candidates": 100
+                    }
+                }
+            ],
+            "rank_window_size": 50,
+            "rank_constant": 20
+        }
+    }
+}
+```
+
+在此示例中，我们独立执行 knn 和 standard 检索器，然后使用 rrf 检索器组合结果。
+
+In this example, we execute the knn and standard retrievers independently of each other. Then we use the rrf retriever to combine the results.
+
+### 多个标准检索器的 RRF
+### RRF with Multiple Standard Retrievers
+
+RRF 检索器提供了一种组合和排名多个标准检索器的方法。主要用例是组合来自传统 BM25 查询和 ELSER 查询的顶部文档以实现改进的相关性。
+
+The rrf retriever provides a way to combine and rank multiple standard retrievers. A primary use case is combining top documents from a traditional BM25 query and an ELSER query to achieve improved relevance.
+
+```json
+GET example-index/_search
+{
+    "retriever": {
+        "rrf": {
+            "retrievers": [
+                {
+                    "standard": {
+                        "query": {
+                            "term": {
+                                "text": "blue shoes sale"
+                            }
+                        }
+                    }
+                },
+                {
+                    "standard": {
+                        "query": {
+                            "sparse_vector":{
+                                "field": "ml.tokens",
+                                "inference_id": "my_elser_model",
+                                "query": "What blue shoes are on sale?"
+                            }
+                        }
+                    }
+                }
+            ],
+            "rank_window_size": 50,
+            "rank_constant": 20
+        }
+    }
+}
+```
+
+## 加权 RRF (Weighted RRF)
+## Weighted RRF
+
+加权 RRF 为每个检索器提供了一个权重参数，以影响其对最终 RRF 分数的贡献。这使您可以为不同的查询类型创建更精细的搜索体验。
+
+Weighted RRF provides a weight parameter for each retriever that influences its contribution to the final RRF score. This allows you to create more nuanced search experiences for different query types.
+
+### 加权 RRF 的工作原理
+### How Weighted RRF Works
+
+在计算最终分数时，标准 RRF 公式通过权重得到增强：
+
+When calculating final scores, the standard RRF formula is enhanced with weights:
+
+```
+Score = weight × 1 / (rank + rank_constant)
+```
+
+每个检索器贡献：权重 × 1 / (排名 + 排名常数)。更高的权重会增加影响力；排名从 1 开始。
+
+Each retriever contributes: weight × 1 / (rank + rank_constant). Higher weights increase influence; ranks start at 1.
+
+### 加权 RRF 使用场景
+### Weighted RRF Use Cases
+
+#### 场景 1: "附近披萨" - 位置导向搜索
+#### Scenario 1: "Pizza near me" - Location-focused search
+
+用户在手机上搜索"附近披萨"。在这种情况下，邻近性最重要。加权 RRF 让我们给予位置信号（城市、社区、邮政编码）比"披萨"关键词匹配更多的影响。
+
+A user on their phone searches for "pizza near me." In this case, proximity matters most. Weighted RRF lets us give more influence to location signals (city, neighborhood, postal code) than to keyword matches for "pizza."
+
+```json
+{
+  "retriever": {
+    "rrf": {
+      "retrievers": [
+        {
+          "retriever": {
+            "standard": {
+              "query": {
+                "multi_match": {
+                  "query": "Vienna",
+                  "fields": ["city", "neighborhood", "postal_code"]
+                }
+              }
+            }
+          },
+          "weight": 0.8
+        },
+        {
+          "retriever": {
+            "standard": {
+              "query": {
+                "match": {
+                  "menu_items": "pizza"
+                }
+              }
+            }
+          },
+          "weight": 0.2
+        }
+      ]
+    }
+  }
+}
+```
+
+这种加权偏向于附近的餐厅，即使菜单文本匹配较弱。
+
+This weighting favors nearby restaurants even if the menu text match is weaker.
+
+#### 场景 2: "供应卡乔佩佩的意大利餐厅" - 菜系和菜品导向搜索
+#### Scenario 2: "Italian restaurants that serve cacio e pepe" - Cuisine and dish-focused search
+
+在这里，用户正在寻找特定的菜系和菜品。加权 RRF 强调菜系和菜单匹配，同时仍允许邻近性发挥次要作用。
+
+Here, the user is looking for a specific cuisine and dish. Weighted RRF emphasizes cuisine and menu matching while still allowing proximity to play a secondary role.
+
+```json
+{
+  "retriever": {
+    "rrf": {
+      "retrievers": [
+        {
+          "retriever": {
+            "standard": {
+              "query": {
+                "match": {
+                  "cuisine_type": "Italian"
+                }
+              }
+            }
+          },
+          "weight": 0.4
+        },
+        {
+          "retriever": {
+            "standard": {
+              "query": {
+                "match": {
+                  "menu_items": "cacio e pepe"
+                }
+              }
+            }
+          },
+          "weight": 0.6
+        }
+      ]
+    }
+  }
+}
+```
+
+这种加权提升了明确提到菜品和菜系的餐厅，即使它们稍微远一些。
+
+This weighting boosts restaurants that explicitly mention the dish and cuisine, even if they're slightly farther away.
+
+#### 场景 3: "高评分意大利餐厅" - 质量和菜系导向搜索
+#### Scenario 3: "Highly reviewed Italian restaurants" - Quality and cuisine-focused search
+
+当质量是优先考虑的因素时，评分起着最重要的作用。加权 RRF 允许评分阈值指导排名，同时保持菜系类型作为辅助因素。
+
+When quality is the priority, ratings carry the most weight. Weighted RRF allows rating thresholds to guide ranking while keeping cuisine type as a supporting factor.
+
+```json
+{
+  "retriever": {
+    "rrf": {
+      "retrievers": [
+        {
+          "retriever": {
+            "standard": {
+              "query": {
+                "range": {
+                  "rating": {"gte": 4.5}
+                }
+              }
+            }
+          },
+          "weight": 0.7
+        },
+        {
+          "retriever": {
+            "standard": {
+              "query": {
+                "match": {
+                  "cuisine_type": "Italian"
+                }
+              }
+            }
+          },
+          "weight": 0.3
+        }
+      ]
+    }
+  }
+}
+```
+
+这种加权提升了高评分的意大利餐厅，保持菜系相关性，同时让评分起主导作用。
+
+This weighting elevates highly rated Italian restaurants, keeping cuisine relevant while letting ratings lead.
+
+## RRF 支持的功能
+## RRF Supported Features
+
+RRF 检索器支持：
+- 聚合 (aggregations)
+- 分页 (from)
+- 建议器 (suggesters)
+- 高亮 (highlighting)
+- 折叠 (collapse)
+- 性能分析 (profiling)
+
+The rrf retriever supports:
+- aggregations
+- from
+- suggesters
+- highlighting
+- collapse
+- profiling
+
+RRF 检索器目前不支持：
+- 滚动 (scroll)
+- 排序 (sort)
+- 重排序 (rescore)
+
+The rrf retriever does not currently support:
+- scroll
+- sort
+- rescore
+
+## RRF 完整示例
+## Complete RRF Example
+
+我们首先为索引创建映射，其中包含文本字段、向量字段和整数字段，并索引几个文档：
+
+We begin by creating a mapping for an index with a text field, a vector field, and an integer field along with indexing several documents:
+
+```json
+PUT example-index
+{
+    "mappings": {
+        "properties": {
+            "text" : {
+                "type" : "text"
+            },
+            "vector": {
+                "type": "dense_vector",
+                "dims": 1,
+                "index": true,
+                "similarity": "l2_norm",
+                 "index_options": {
+                     "type": "hnsw"
+                 }
+            },
+            "integer" : {
+                "type" : "integer"
+            }
+        }
+    }
+}
+```
+
+```json
+PUT example-index/_doc/1
+{
+    "text" : "rrf",
+    "vector" : [5],
+    "integer": 1
+}
+```
+
+```json
+PUT example-index/_doc/2
+{
+    "text" : "rrf rrf",
+    "vector" : [4],
+    "integer": 2
+}
+```
+
+```json
+PUT example-index/_doc/3
+{
+    "text" : "rrf rrf rrf",
+    "vector" : [3],
+    "integer": 1
+}
+```
+
+```json
+PUT example-index/_doc/4
+{
+    "text" : "rrf rrf rrf rrf",
+    "integer": 2
+}
+```
+
+```json
+PUT example-index/_doc/5
+{
+    "vector" : [0],
+    "integer": 1
+}
+```
+
+```json
+POST example-index/_refresh
+```
+
+现在我们执行一个使用 RRF 检索器的搜索，其中包含指定 BM25 查询的标准检索器、指定 kNN 搜索的 knn 检索器以及术语聚合：
+
+Now we execute a search using an rrf retriever with a standard retriever specifying a BM25 query, a knn retriever specifying a kNN search, and a terms aggregation:
+
+```json
+GET example-index/_search
+{
+    "retriever": {
+        "rrf": {
+            "retrievers": [
+                {
+                    "standard": {
+                        "query": {
+                            "term": {
+                                "text": "rrf"
+                            }
+                        }
+                    }
+                },
+                {
+                    "knn": {
+                        "field": "vector",
+                        "query_vector": [3],
+                        "k": 5,
+                        "num_candidates": 5
+                    }
+                }
+            ],
+            "rank_window_size": 5,
+            "rank_constant": 1
+        }
+    },
+    "size": 3,
+    "aggs": {
+        "int_count": {
+            "terms": {
+                "field": "integer"
+            }
+        }
+    }
+}
+```
+
+## RRF 在混合检索中的应用
+## RRF in Hybrid Retrieval
+
+RRF 在混合检索场景中特别有用，它可以将基于关键词的检索（如 BM25）与基于向量的检索（如语义搜索）结合起来：
+
+RRF is particularly useful in hybrid retrieval scenarios, combining keyword-based retrieval (such as BM25) with vector-based retrieval (such as semantic search):
+
+1. **传统搜索 vs 语义搜索**: 将传统的 BM25 关键词匹配与现代的向量语义搜索相结合
+2. **稀疏 vs 密集向量**: 组合稀疏向量（如 ELSER）和密集向量检索
+3. **多模态检索**: 结合文本、图像等多种检索方式的结果
+
+1. **Traditional search vs semantic search**: Combining traditional BM25 keyword matching with modern vector semantic search
+2. **Sparse vs dense vectors**: Combining sparse vector (such as ELSER) and dense vector retrieval
+3. **Multimodal retrieval**: Combining results from text, image, and other retrieval methods
+
+## 总结
+## Conclusion
+
+Reciprocal Rank Fusion (RRF) 是一种强大的技术，用于组合来自多个检索器的结果，无需复杂的权重调整。通过加权 RRF，您可以进一步微调不同检索器的影响，为特定的搜索场景创建更精确的结果。
+
+Reciprocal Rank Fusion (RRF) is a powerful technique for combining results from multiple retrievers without complex weight tuning. With weighted RRF, you can further fine-tune the influence of different retrievers to create more precise results for specific search scenarios.
+
+RRF 消除了找出适当权重的需要，使用线性组合，并且已被证明比单独使用任一查询提供更好的相关性。
+
+RRF eliminates the need to figure out what the appropriate weighting is using linear combination, and is also shown to give improved relevance over either query individually.

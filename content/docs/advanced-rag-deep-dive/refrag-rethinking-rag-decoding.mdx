@@ -1,0 +1,171 @@
+---
+title: "REFRAG：RAG 解码再思考——压缩·感知·扩展的高效框架"
+description: "基于 Meta Superintelligence Labs 论文《REFRAG: Rethinking RAG based Decoding》的系统学习与工程落地指南。"
+---
+
+<Callout title="TL;DR" type="info">
+  <p><strong>REFRAG</strong> 用独立且轻量的 <strong>编码器</strong>将检索段落按块压缩为 <strong>Chunk Embeddings</strong>，解码时直接喂入解码器；对少数关键块再按需<strong>选择性展开</strong>为原始 token。</p>
+  <p>收益：显著降低 KV Cache 和注意力开销，<strong>TTFT 加速最高 30.85×</strong>，吞吐提升最高 6.78×，<strong>无精度损失</strong>，并将上下文窗口有效扩展至原来的 <strong>16×</strong>。</p>
+</Callout>
+
+## 0. 为什么要关心 REFRAG？
+
+- RAG 系统将大量检索段落拼接进提示，只有小部分与问题强相关，注意力呈<strong>块对角稀疏</strong>结构。
+- 传统解码把所有 token 都当成“同等重要”，导致：
+  - KV Cache 内存随上下文长度线性增长；
+  - 首 token 延迟（TTFT）随长度近似二次增长；
+  - 迭代令牌延迟（TTIT）线性增长，整体吞吐下降。
+- 这对搜索、客服、智能体等<strong>低延迟高吞吐</strong>场景构成瓶颈。
+
+REFRAG 的观点：在 RAG 的解码阶段，<strong>大量计算是可省的</strong>。
+
+## 1. REFRAG 的核心思想
+
+- 压缩（Compress）：将上下文分块，每块 k 个 token，经轻量编码器（如 RoBERTa）得到块向量 <code>c_i</code>，再经投影层 <code>ϕ</code> 映射到与解码器 token 嵌入同维度的表示 <code>ê_i</code>。
+- 感知（Sense）：用一个<strong>轻量 RL 策略</strong>学习判断哪些块必须保留为原始 token，哪些块可用压缩表示，无需修改解码器架构与自回归属性。
+- 扩展（Expand）：对被判定为关键的少量块，<strong>按需展开</strong>为原始 token 嵌入，其余用压缩块嵌入参与注意力计算。
+
+结果：解码器的“有效输入长度”从 token 数缩减到<strong>块数</strong>，注意力计算从“按 token 的二次复杂度”降到“按块的二次复杂度”。
+
+## 2. 体系结构与数据流
+
+- 解码器：常规模型（如 LLaMA 系列），<strong>无需改动参数或结构</strong>。
+- 编码器：轻量模型（RoBERTa-Base/Large 等），<strong>可预计算与缓存</strong>检索语料或热文档的块嵌入。
+- 投影层：两层 MLP，将编码器输出对齐到解码器 token 嵌入空间。
+- 选择性压缩：RL 策略在保持自回归的前提下，对任意位置的块做“压缩/展开”决策（不是仅限前缀）。
+
+压缩率记为 <code>k</code>（每块 k 个 token）。在典型 RAG 中，问题 token 数远小于上下文 token 数（s ≫ q），因此总解码输入长度近似缩短到原来的 <code>1/k</code>。
+
+## 3. 训练方法（确保“压缩后仍可用”）
+
+1) 重构任务（先对齐再解压）
+- 冻结解码器，仅训练编码器与投影层：输入原文前 s 个 token，目标是<strong>重构</strong>这 s 个 token。
+- 目的：让编码器学会“把 k 个 token 信息装进一个向量”，让投影层学会把该向量“翻译回解码器可懂的 token 空间”。
+
+2) 课程学习（从易到难，逐块到全序列）
+- 先用单块重构，再逐步增加块数和序列长度，采用几何级配比的数据混合，显著提升优化稳定性与最终困惑度。
+
+3) 持续预训练（CPT：下一段预测）
+- 解码器解锁，与编码器联合训练，任务为“用前 s 的信息预测后 o 个 token”，使解码器学会利用块嵌入进行生成。
+
+4) 监督微调（SFT）
+- 面向具体下游任务（RAG、多轮对话、摘要）做指令微调，输入中混合“压缩块嵌入 + 原始 token”。
+
+5) RL 选择性压缩
+- 动作：在 L 个块里挑选 T′ 个需要以原始 token 形式保留的块；
+- 策略：两层 Transformer 头对块嵌入打分，按序选择；
+- 奖励：负困惑度；
+- 技巧：采用分组基线（GRPO 风格）降低方差，提高稳定性。
+
+## 4. 复杂度与加速效果（要点）
+
+- 短上下文：TTFT 与吞吐理论上可达 <code>k×</code> 加速；
+- 长上下文：TTFT 与吞吐理论上可达 <code>k^2×</code>（块二次 vs token 二次）。
+- 实证要点：
+  - k = 16：TTFT 加速 16.53×（缓存），8.59×（无缓存）；
+  - k = 32：TTFT 加速最高 30.85×（相较 LLaMA），对比 CEPE 进一步提高 3.75×；
+  - 吞吐最高 6.78×；
+  - 与 CEPE 相比，平均<strong>对数困惑度</strong>提升约 9.3%。
+
+说明：无缓存场景仍然受益，因为编码器轻量且块并行，无跨块注意力开销。
+
+## 5. 实验结论速览（多任务、多上下文）
+
+- 数据：Slimpajama（ArXiv/Books 子集 20B token）、PG19、Proof-pile 等。
+- 任务：
+  - RAG（多数据集，包括 KILT 套件、MMLU、BoolQ 等）
+  - 多轮对话 + RAG（TopiOCQA、ORConvQA、QReCC）
+  - 长文档摘要（ArXiv、PubMed）
+- 核心发现：
+  - 在<strong>同等延迟</strong>（解码器 token 数相当）下，REFRAG 能携带更多上下文段落，整体精度更高；
+  - 在<strong>强检索器</strong>下，REFRAG 与 LLaMA 表现相当；在<strong>弱检索器</strong>下，REFRAG 因能容纳更多上下文而<strong>更优</strong>；
+  - 多轮对话场景，LLaMA 4k 限制导致历史截断，而 REFRAG 可扩展有效上下文，随轮次增长保持稳定；
+  - 摘要任务在同等解码器 token 预算下，REFRAG 系列取得更高 ROUGE；
+  - 上下文从 2k 扩到 16k，REFRAG8/16 仍保持优于或接近完整上下文的困惑度。
+
+## 6. 与相关工作的差异
+
+- CEPE：通过并行编码上下文并改写注意力为交叉注意，但<strong>破坏因果结构</strong>，更像“前缀上下文”方案，不适用于任意位置压缩与多轮/摘要。且推断时仍有额外投影成本。
+- REPLUG：侧重检索与生成的集成与重排序，不涉及<strong>解码阶段的表示压缩</strong>，可与 REFRAG 互补。
+- PCC（2025）：将过往上下文压缩为存储可检索的向量，但同样偏向前缀形态，不支持任意位置的自由折叠与展开。
+
+## 7. 工程落地建议（给 RAG 团队）
+
+- 何时采用：
+  - 延迟/吞吐是首要约束；
+  - 检索段落较多且相互独立，注意模式具块稀疏性；
+  - 需要在不改动主解码器的前提下扩展有效上下文。
+
+- 集成路径：
+  1) <strong>离线/在线预计算</strong>：对文档分块（k 建议 8/16 起步），用编码器生成块嵌入并缓存到向量库；
+  2) <strong>检索阶段</strong>：拿到候选段落后，直接提取其块嵌入（命中缓存），避免再次编码；
+  3) <strong>输入装配</strong>：问题 token 嵌入 + 若干块嵌入；
+  4) <strong>选择性展开</strong>：RL 策略对少数关键块替换为原始 token 嵌入；
+  5) <strong>解码</strong>：常规模型前向，无需改架构。
+
+- 评测与监控：
+  - 线上：TTFT、TTIT、Throughput、内存峰值、命中率（块嵌入缓存）；
+  - 线下：任务指标（EM/F1/Acc）、困惑度、压缩率-精度曲线；
+  - 策略对比：RL vs 困惑度启发式 vs 随机抽样。
+
+- 参数与资源：
+  - 编码器建议 RoBERTa-Base/Large；投影层 2 层 MLP；
+  - k 的上限受可接受精度影响：论文显示 32 仍具竞争力，64 过高易退化；
+  - 课训与 CPT 使用几何配比课程学习；批量并行和 FSDP 可提升训练吞吐。
+
+- 风险与回退：
+  - 检索噪声高时，过度压缩可能放大无关信息的影响；
+  - 需提供“全 token 回退”与“降低压缩率”的快速开关；
+  - 监控 RL 策略漂移，定期用离线评测校准。
+
+## 8. 参考实现要点（伪代码）
+
+```python path=null start=null
+# 假设已检索到若干段落 passages，每段被分成 k-token 的块
+# 需要：encode_chunk、project_to_decoder_space、rl_select_expand
+
+question_tokens = tokenize(question)
+chunk_embeds = []
+for p in passages:
+    for chunk in chunkify(p, k):
+        c = encode_chunk(chunk)                 # 轻量编码器
+        e = project_to_decoder_space(c)         # ϕ 投影到解码器嵌入维度
+        chunk_embeds.append({"chunk": chunk, "embed": e})
+
+# RL 策略决定哪些块需要展开为原始 token
+expand_mask = rl_select_expand(question_tokens, chunk_embeds)
+
+decoder_inputs = []
+decoder_inputs.extend(token_embed(question_tokens))
+for i, ce in enumerate(chunk_embeds):
+    if expand_mask[i]:
+        decoder_inputs.extend(token_embed(ce["chunk"]))  # 展开为原始 token 嵌入
+    else:
+        decoder_inputs.append(ce["embed"])               # 使用压缩块嵌入
+
+# 喂入解码器进行生成
+outputs = decoder_generate(decoder_inputs)
+```
+
+## 9. 常见问题（FAQ）
+
+- Q：不改解码器，为什么能“懂”块嵌入？
+  - A：通过“重构任务 + CPT + SFT”，编码器与投影层被对齐到解码器的 token 空间，解码器学会把块嵌入当作“浓缩的 token 序列片段”。
+
+- Q：一定要用 RL 吗？
+  - A：可用困惑度启发式替代，但论文显示 RL 在不同压缩率下<strong>稳定优于</strong>启发式与随机。
+
+- Q：与“提示压缩”方法（如 LLMLingua）冲突吗？
+  - A：不冲突，可叠加。提示压缩在 token 级做删减/重写；REFRAG 在表示级做块替换，两者目标一致但作用层面不同。
+
+- Q：如何选 k？
+  - A：从 8 或 16 起步，监控精度与延迟权衡。32 通常仍可接受；64 容易退化。
+
+## 10. 小结
+
+REFRAG 针对 RAG 的结构性稀疏，提出“压缩-感知-扩展”的解码新范式：
+- 大幅降低 TTFT 和内存占用，显著提升吞吐；
+- 在不改解码器的前提下扩展有效上下文，适配多轮与长文场景；
+- 通过课程学习与 RL 选择性压缩，在<strong>几乎不损失</strong>困惑度和任务精度的条件下实现工程化落地。
+
+参考：Lin et al., 2025, REFRAG: Rethinking RAG based Decoding（开放许可）。

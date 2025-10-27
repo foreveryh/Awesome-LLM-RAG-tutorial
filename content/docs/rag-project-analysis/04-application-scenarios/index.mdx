@@ -1,0 +1,42 @@
+---
+title: 04 实战应用场景
+description: 企业知识库、个人知识管理、代码问答、多模态、客服等场景的落地方案与项目映射
+---
+
+<Callout type="success" title="本章定位">
+把“场景问题”与“开源项目实现”打通：为每个实战场景给出可复用架构、关键技术清单，并映射到已完成的项目深度解析文章。
+</Callout>
+
+# 04 实战应用场景
+
+## 快速入口
+
+<Cards>
+  <Card title="企业知识库 RAG" description="多租户、RBAC、审计与可观测性" href="/docs/rag-project-analysis/04-application-scenarios/01-enterprise-knowledge-base"/>
+  <Card title="个人知识管理 RAG" description="隐私本地化、轻量部署、笔记生态" href="/docs/rag-project-analysis/04-application-scenarios/02-personal-knowledge-management"/>
+  <Card title="代码库问答 RAG" description="AST/依赖图、混合检索、精确定位" href="/docs/rag-project-analysis/04-application-scenarios/03-code-qa"/>
+  <Card title="多模态 RAG" description="图像/表格/公式解析与跨模态检索" href="/docs/rag-project-analysis/04-application-scenarios/04-multimodal-rag"/>
+  <Card title="客服问答系统" description="NLU+FAQ+知识检索+对话管理" href="/docs/rag-project-analysis/04-application-scenarios/05-customer-service"/>
+</Cards>
+
+## 场景 ⇄ 项目映射
+
+下表把每个场景与本教程已完成的“重点项目深度解析”建立直接关联，便于按需跳转到代码级实现细节。
+
+| 场景 | 推荐项目 | 关键能力 | 深入阅读 |
+|---|---|---|---|
+| 企业知识库 | onyx | 多租户/RBAC/审计、LangGraph 工作流、Vespa 混检 | [onyx 深度解析](/docs/rag-project-analysis/04-key-projects-analysis/onyx) |
+| 企业知识库 | SurfSense | 向量+BM25 混合检索、RRF 融合、轻量重排 | [SurfSense 深度解析](/docs/rag-project-analysis/04-key-projects-analysis/surfsense) |
+| 企业知识库 | LightRAG | 通用基座、检索策略与参数网格、迁移建议 | [LightRAG 深度解析](/docs/rag-project-analysis/04-key-projects-analysis/lightrag) |
+| 多模态 RAG | ragflow | PDF/表格/公式解析流水线、ColPali 融合 | [ragflow 深度解析](/docs/rag-project-analysis/04-key-projects-analysis/ragflow) |
+| 个人知识管理 | LightRAG | 轻量化索引、Token 感知分块、单机易用 | [LightRAG 深度解析](/docs/rag-project-analysis/04-key-projects-analysis/lightrag) |
+| 客服问答 | onyx | Slack/HTTP 接入、权限与审计、生产可运维 | [onyx 深度解析](/docs/rag-project-analysis/04-key-projects-analysis/onyx) |
+| 代码库问答 | SurfSense + LightRAG | 混合检索 + 自定义分块/重排 | [SurfSense](/docs/rag-project-analysis/04-key-projects-analysis/surfsense)、[LightRAG](/docs/rag-project-analysis/04-key-projects-analysis/lightrag) |
+
+提示：其余项目（RAG-Anything、kotaemon、Verba、Self-Corrective-Agentic-RAG、UltraRAG）将在对应“重点项目深度解析”上线后补充链接映射。
+
+## 使用建议
+
+- 先在本章选定目标场景与能力清单，再跳转对应项目深挖实现细节
+- 若出现“表现与预期不符”，回到 Pipeline 深度剖析与参数网格章节对症调参
+- 企业落地优先关注 onyx；多模态优先关注 ragflow；轻量个人优先 LightRAG；混合检索关注 SurfSense

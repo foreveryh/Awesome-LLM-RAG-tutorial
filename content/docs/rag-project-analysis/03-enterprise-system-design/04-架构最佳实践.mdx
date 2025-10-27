@@ -1,0 +1,48 @@
+---
+title: 架构与工程最佳实践
+description: 从存储/索引/并发/可观测/安全等方面给出工程级落地清单
+---
+
+<Callout type="success" title="适用范围">
+适用于基于 onyx/LightRAG/RAG-Anything 等项目的二次开发与生产部署。
+</Callout>
+
+# 架构与工程最佳实践
+
+## 1. 存储与命名
+
+- 工作区/租户隔离：数据库/索引按 workspace 前缀划分；跨租户查询必须带强过滤
+- 元数据版本化：document.version + chunk.version + schema_version
+- 冷热分层：近期热数据在内存/SSD，历史数据走对象存储 + 按需索引
+
+## 2. 索引与检索
+
+- 组合索引：主库 B-Tree + 全文 FTS + 向量 ANN（HNSW/IVF）
+- 批处理：批量导入/删除/重建索引，限制批量大小与节流
+- 缓存：Embedding 缓存 + 语义缓存（query hash）+ Rerank 结果缓存
+
+## 3. 并发与一致性
+
+- 幂等键：所有写接口支持 Idempotency-Key
+- 分布式锁：索引重建、批量导入使用租约锁（Redis/DB）
+- 事件通知：索引完成/失败通过队列/回调通知
+
+## 4. 可观测与调优
+
+- 日志：结构化（request_id/tenant_id/doc_id），保留调用链
+- 指标：QPS/P95 延迟、召回率、向量库用时、失败率
+- 追踪：OpenTelemetry + DAG 节点耗时，可回放与重试
+
+## 5. 安全与合规
+
+- RBAC + 最小权限：角色/组/用户三级
+- 传输/存储加密：TLS + KMS（密钥轮换）
+- 审计：写操作与敏感读操作入审计流，保留 ≥ 1 年
+
+## 6. 部署建议
+
+- 分环境：dev/staging/prod 配置隔离，启用蓝绿/金丝雀发布
+- 资源定额：Worker/索引节点按 CPU/内存配额弹性伸缩
+- 备份与演练：定期备份向量库与元数据，月度恢复演练
+
+以上清单覆盖上线所需的关键“非功能性要求”，可作为生产 readiness checklist 使用。

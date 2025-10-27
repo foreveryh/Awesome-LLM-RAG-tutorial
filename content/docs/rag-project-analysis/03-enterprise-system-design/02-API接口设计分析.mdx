@@ -1,0 +1,73 @@
+---
+title: API 接口设计分析
+description: 从资源建模、契约与幂等、安全与多租户、可观测与工作流四个方面对比与落地
+---
+
+<Callout type="info" title="评审标准">
+接口设计以“稳定契约 + 可演进”为核心：清晰的资源模型、强幂等、鉴权与隔离、完备的回调与可观测。
+</Callout>
+
+# API 接口设计分析
+
+## 一、资源模型（Resource Model）
+
+常见核心资源：
+- source/document/chunk：原始文档 → 解析后文档 → 分块（版本、状态、校验）
+- embedding/index：向量生成与索引构建（批处理/增量）
+- query/session/message：检索会话与对话消息（引用证据、分页）
+
+设计建议：
+- 所有可变资源带 version 与 status（pending/indexed/failed）
+- 引入 idempotency_key 实现批处理幂等
+- 异步任务统一 Task 资源：task_id、progress、callback_url
+
+## 二、契约与幂等
+
+- 写接口（导入、索引、删除）必须支持幂等键（Idempotency-Key）
+- 批处理：上限、分片大小、失败重试与死信队列约定
+- 回调：成功/失败/部分成功，建议签名校验（HMAC）
+
+示例（文档导入）：
+```http path=null start=null
+POST /v1/documents
+Idempotency-Key: 7f1e...
+{
+  "workspace": "team-a",
+  "documents": [{"doc_id": "...", "uri": "s3://...", "checksum": "..."}]
+}
+```
+
+## 三、安全与多租户
+
+- 鉴权：OAuth2/OIDC/JWT，最小权限（least privilege）
+- 租户隔离：workspace/namespace + 资源前缀化 + 过滤器强约束
+- 审计：写操作与敏感读操作入审计流（包含 IP/UserAgent）
+
+过滤示例（向量检索）：
+```json path=null start=null
+{
+  "query": "...",
+  "filter": {
+    "workspace": "team-a",
+    "$or": [{"access_level": "public"}, {"owner": "u123"}, {"groups": {"$in": ["sales"]}}]
+  }
+}
+```
+
+## 四、可观测与工作流
+
+- 追踪：X-Request-ID + 分布式追踪（OpenTelemetry）
+- 指标：QPS、延迟 P50/P95、召回率、Rerank 用时、向量库调用用时
+- 日志：结构化日志（request_id、tenant_id、doc_id）
+- 工作流：索引/检索链路均建模为 DAG，节点可重试/回放
+
+## 五、项目对比（要点）
+
+- onyx：工作流与权限边界清晰，Task/Callback/审计最完整
+- LightRAG：资源模型清晰、扩展点多，适合二次开发
+- RAG-Anything：解析/索引侧契约细化，多模态资源更全面
+- SurfSense：检索与重排接口清晰，混合检索易扩展
+
+## 结论
+
+若面向企业落地，以 onyx 接口设计为标杆；通用研发与二开优先 LightRAG 的抽象模型，结合本节幂等/审计/追踪建议即可快速生产化。

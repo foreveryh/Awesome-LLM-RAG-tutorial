@@ -1,0 +1,11 @@
+{
+  "title": "04 实战应用场景",
+  "description": "企业级、个人级、代码库、多模态、客服等典型应用场景的完整落地方案",
+  "pages": [
+    "01-enterprise-knowledge-base",
+    "02-personal-knowledge-management",
+    "03-code-qa",
+    "04-multimodal-rag",
+    "05-customer-service"
+  ]
+}

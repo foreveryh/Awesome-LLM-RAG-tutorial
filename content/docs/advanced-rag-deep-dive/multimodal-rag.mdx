@@ -1,0 +1,336 @@
+---
+title: "Multimodal Retrieval-Augmented Generation (RAG) | 多模态检索增强生成 (RAG)"
+description: "Learn about Multimodal RAG that extends traditional RAG systems from text-only to other modalities like images, audio, and video. | 了解多模态RAG，它将传统RAG系统从仅文本扩展到图像、音频和视频等其他模态。"
+---
+
+# Multimodal Retrieval-Augmented Generation (RAG)
+# 多模态检索增强生成 (RAG)
+
+Multimodal Retrieval-Augmented Generation (MM-RAG) extends the capabilities of traditional [Retrieval-Augmented Generation (RAG)](https://weaviate.io/blog/introduction-to-rag) systems from text-only modalities to other modalities, like images, audio, and video. The multimodal aspect refers to both the retrieval pipeline with [multimodal embedding models](https://weaviate.io/blog/multimodal-models) the generation pipeline with multimodal generative models, such as vision language models.
+
+多模态检索增强生成（MM-RAG）扩展了传统[检索增强生成（RAG）](https://weaviate.io/blog/introduction-to-rag)系统的能力，从仅文本模态扩展到其他模态，如图像、音频和视频。多模态方面指的是[多模态嵌入模型](https://weaviate.io/blog/multimodal-models)的检索流水线和多模态生成模型（如视觉语言模型）的生成流水线。
+
+[The average human hears and learns from about 1 billion words in their entire lifetime](https://youtu.be/Ckz8XA2hW84?t=2286). This might be an over-approximation, but it is in the correct ballpark because 1 billion seconds is about 30 years, and we don't hear more than a few words per second. Accounting for sleeping, eating, and other activities, doing some back-of-the-napkin calculations, we can arrive at the above number.
+
+[人类一生中平均听到和学习大约10亿个单词](https://youtu.be/Ckz8XA2hW84?t=2286)。这可能是一个过度近似，但它在正确的范围内，因为10亿秒大约是30年，我们每秒听到的单词不超过几个。考虑到睡眠、饮食和其他活动，做一些粗略的计算，我们可以得出上面的数字。
+
+The issue, however, is that current Large Language Models (LLMs) are trained on trillions of tokens, many orders of magnitude more data than we ever see in our lifetime. Yet they still don't have as vivid of an understanding of the causal relationships that exist in the world. From this, we can infer that the way humans learn is fundamentally different from how our current state-of-the-art models learn. Humans have a remarkable ability to learn and build world models through the integration of multiple sensory inputs. Our combination of senses works synergistically to provide us with rich and diverse information about our environment. By combining and interpreting these sensory inputs, we can form a coherent understanding of the world, make predictions, acquire new knowledge, and establish causal relationships very efficiently. Not only do humans capture and use multimodal representations of information, but given a task, we can also incorporate any of these modalities as context to help us guide our answers.
+
+然而，问题在于当前的大语言模型（LLMs）在数万亿个标记上进行训练，这比我们一生中看到的要多几个数量级的数据。然而，它们对世界上存在的因果关系的理解仍然不如人类那样生动。从这一点，我们可以推断人类学习的方式与我们当前最先进模型的学习方式根本不同。人类具有通过整合多种感官输入来学习和构建世界模型的非凡能力。我们的感官组合协同工作，为我们提供关于环境的丰富和多样化的信息。通过结合和解释这些感官输入，我们能够形成对世界的连贯理解，做出预测，获取新知识，并非常有效地建立因果关系。人类不仅捕获和使用信息的多模态表示，而且在给定任务时，我们还可以将这些模态中的任何一种作为上下文来帮助指导我们的答案。
+
+If you'd like to explore this line of thinking further and the potential problems that need to be addressed when getting computers to take advantage of multimodal data, have a look at my previous [blog on multimodal embedding models](https://weaviate.io/blog/multimodal-models).
+
+如果您想进一步探索这种思路，以及在让计算机利用多模态数据时需要解决的潜在问题，请看我之前的[多模态嵌入模型博客](https://weaviate.io/blog/multimodal-models)。
+
+## TLDR
+
+In this post, we'll touch on:
+
+在本文中，我们将涉及：
+
+* **Contrastive Learning:** One particular approach to training multimodal embedding models that can understand images, audio, video, text, and more
+* **对比学习：**一种训练多模态嵌入模型的特殊方法，可以理解图像、音频、视频、文本等
+
+* **Any-to-Any Search and Retrieval:** Using multimodal embedding models to perform any-to-any search and scaling these multimodal embeddings into production using [vector databases](https://weaviate.io/blog/what-is-a-vector-database), like Weaviate (_with code examples!_)
+* **任意到任意搜索和检索：**使用多模态嵌入模型执行任意到任意搜索，并使用[向量数据库](https://weaviate.io/blog/what-is-a-vector-database)如Weaviate将这些多模态嵌入扩展到生产环境（_附代码示例！_）
+
+* **Multimodal Retrieval-Augmented Generation (MM-RAG)**: Augmenting the generation from Large Multimodal Models (LMMs) with multimodal information retrieval of images and more for visual question answering systems.
+* **多模态检索增强生成（MM-RAG）**：通过多模态信息检索（如图像）增强大语言多模态模型（LMMs）的生成，用于视觉问答系统。
+
+* **Code Demo of RAG**
+* **RAG代码演示**
+
+## Joint Embedding Space Through Contrastive Learning
+## 通过对比学习联合嵌入空间
+
+One way to train a model that understands multimodal data including images, audio, video, and text is to first train individual models that understand each one of these modalities separately and then unify their representations of data using a process called contrastive training.
+
+训练理解多模态数据（包括图像、音频、视频和文本）的模型的一种方法是首先分别训练理解这些模态中每一个的个别模型，然后使用称为对比训练的过程统一它们的数据表示。
+
+Contrastive training unifies the vector space representation of models by pushing conceptually different embeddings from different modalities further apart or pulling similar ones closer together. This is demonstrated in the image below:
+
+对比训练通过将来自不同模态的概念上不同的嵌入推得更远或将相似的嵌入拉得更近来统一模型的向量空间表示。这在下图中得到演示：
+
+This process was carried out in MetaAI's [ImageBind paper](https://arxiv.org/abs/2305.05665) to unify vector spaces across 6 different modalities, including images, text, audio, and video. To successfully perform contrastive training they used multiple labeled datasets of positive points across multiple modalities and randomly sampled for negative points.
+
+这个过程在MetaAI的[ImageBind论文](https://arxiv.org/abs/2305.05665)中实现，用于统一6种不同模态（包括图像、文本、音频和视频）的向量空间。为了成功执行对比训练，他们使用了来自多个模态的正样本的多个标记数据集，并随机采样负样本。
+
+To get a better intuitive understanding of how this process works, imagine you embed the image of a lion into vector space using a vision model. The concept behind this object is similar to the audio of a lion roaring, so the audio object embedding can be used as a positive sample,e and the contrastive loss function works to pull these two points together in embedding space. On the other hand, the embedding of an image of a salad is a negative example and therefore needs to be pushed apart. Have a look at the modification of the above visual to account for cross-modal contrastive training:
+
+为了更好地直观理解这个过程如何工作，想象一下你使用视觉模型将狮子的图像嵌入到向量空间中。这个对象背后的概念类似于狮子咆哮的音频，因此音频对象嵌入可以用作正样本，对比损失函数在嵌入空间中工作以将这两个点拉在一起。另一方面，沙拉图像的嵌入是负样本，因此需要被推远。查看上面视觉的修改以考虑跨模态对比训练：
+
+If we can continually do this for a large enough dataset of labeled points, then we can tighten the representations of data objects in embedding space and even unify the models of different modalities. Another benefit of ImageBind was the use of frozen image model representations to bind other modalities with cross-modal contrastive loss training. This is why it's called ImageBind. Embeddings that start differently can then be pulled towards the image representations. Thus, all of the similar concepts across modalities can be unified such that a concept across all modalities will have similar vectors - demonstrated in the image below. To learn in more depth about contrastive representation learning, I would recommend this [blog](https://lilianweng.github.io/posts/2021-05-31-contrastive/).
+
+如果我们能够对足够大的标记点数据集持续做到这一点，那么我们可以收紧嵌入空间中数据对象的表示，甚至统一不同模态的模型。ImageBind的另一个好处是使用冻结的图像模型表示来绑定其他模态与跨模态对比损失训练。这就是为什么它被称为ImageBind。开始时不同的嵌入然后可以被拉向图像表示。因此，所有跨模态的相似概念都可以统一，这样跨所有模态的概念将具有相似的向量 - 在下图中演示。要更深入地了解对比表示学习，我推荐这个[博客](https://lilianweng.github.io/posts/2021-05-31-contrastive/)。
+
+Shows a unified embedding model that captures meanings from any modality that was fused during the contrastive training step.
+
+显示一个统一嵌入模型，捕获在对比训练步骤中融合的任何模态的含义。
+
+## Any-to-Any Search
+## 任意到任意搜索
+
+Once we have a unified embedding space, we can perform cross-modal object operations such as cross-modal search and retrieval. This means that we can pass in as a query any modality the model understands and use it to perform [vector similarity search](https://weaviate.io/blog/vector-search-explained) in multimodal embedding space, getting back objects of any other modality that are similar in concept. You can also use this unified embedding space to perform cross-modal embedding arithmetic. For example, you can answer questions like what an image of a pigeon and the audio of a bike revving look like together.
+
+一旦我们有了统一的嵌入空间，我们就可以执行跨模态对象操作，如跨模态搜索和检索。这意味着我们可以传入模型理解的任何模态作为查询，并使用它在多模态嵌入空间中执行[向量相似性搜索](https://weaviate.io/blog/vector-search-explained)，返回概念相似的任何其他模态的对象。您也可以使用这个统一的嵌入空间来执行跨模态嵌入算术。例如，您可以回答鸽子的图像和自行车加速的音频一起看起来像什么这样的问题。
+
+In [this Jupyter notebook](https://github.com/weaviate-tutorials/multimodal-workshop/blob/main/2-multimodal/1-multimedia-search-complete.ipynb), we show how you can use the `multi2vec-bind` module in Weaviate to use the ImageBind model to add multimedia files to a vector database. Then we can perform any-to-any search over that data.
+
+在[这个Jupyter笔记本](https://github.com/weaviate-tutorials/multimodal-workshop/blob/main/2-multimodal/1-multimedia-search-complete.ipynb)中，我们展示了如何使用Weaviate中的`multi2vec-bind`模块来使用ImageBind模型将多媒体文件添加到向量数据库。然后我们可以对该数据执行任意到任意搜索。
+
+You can also use this diagram explaining any-to-any search to get an intuition of how the following code leverages the unified embedding space previously generated to perform the search.
+
+您也可以使用这个解释任意到任意搜索的图表来直观了解下面的代码如何利用之前生成的统一嵌入空间来执行搜索。
+
+Any-to-any search: Shows that any of the modalities understood and embedded by the multimodal model can be passed in as a query, and objects of any modality that are conceptually similar can be returned.
+
+任意到任意搜索：显示多模态模型理解和嵌入的任何模态都可以作为查询传入，概念相似的任何模态的对象都可以返回。
+
+### Step 1: Create a Multimodal Collection
+### 步骤 1：创建多模态集合
+
+First, you need to create a collection that can hold data in different modalities, such as audio, images, and video.
+
+首先，您需要创建一个可以保存不同模态数据的集合，如音频、图像和视频。
+
+```python
+client.collections.create(
+    name="Animals",
+    vectorizer_config=wvc.config.Configure.Vectorizer.multi2vec_bind(
+        audio_fields=["audio"],
+        image_fields=["image"],
+        video_fields=["video"],
+    ))
+```
+
+### Step 2: Insert Images and Other Media
+### 步骤 2：插入图像和其他媒体
+
+```python
+source = os.listdir("./source/image/")
+items = list()
+for name in source:
+    print(f"Adding {name}")
+    path = "./source/image/" + name
+    items.append({
+        "name": name,
+        "path": path,
+        "image": toBase64(path),
+        "mediaType": "image"
+    })
+animals = client.collections.get("Animals")
+animals.data.insert_many(items)
+```
+
+### Step 3: Performing Image Search
+### 步骤 3：执行图像搜索
+
+```python
+response = animals.query.near_image(
+    near_image=toBase64("./test/test-cat.jpg"),
+    return_properties=['name','path','mediaType'],
+    limit=3)
+```
+
+For a more detailed breakdown, refer to the [complete notebook](https://github.com/weaviate-tutorials/multimodal-workshop/blob/main/2-multimodal/1-multimedia-search-complete.ipynb) and [supporting repository](https://github.com/weaviate-tutorials/).
+
+有关更详细的分解，请参考[完整的笔记本](https://github.com/weaviate-tutorials/multimodal-workshop/blob/main/2-multimodal/1-multimedia-search-complete.ipynb)和[支持仓库](https://github.com/weaviate-tutorials/)。
+
+Using a vector database, like Weaviate, to store and perform fast and real-time retrieval of object embeddings allows us to scale the usage of these multimodal models. This allows us to power multimodal search in production and to integrate into our applications the cross-modal operations that we've discussed.
+
+使用向量数据库，如Weaviate，来存储和执行对象嵌入的快速和实时检索，使我们能够扩展这些多模态模型的使用。这使我们能够在生产中支持多模态搜索，并将我们讨论的跨模态操作集成到我们的应用程序中。
+
+## Multimodal Retrieval-Augmented Generation (MM-RAG)
+## 多模态检索增强生成 (MM-RAG)
+
+RAG allows us to pack retrieved documents into a prompt so that a language model can read relevant information before generating a response. This allows us to scale the knowledge of large language models without having to train or fine-tune them every time we have updated information.
+
+RAG允许我们将检索到的文档打包到提示中，以便语言模型在生成响应之前读取相关信息。这使我们能够扩展大语言模型的知识，而无需每次有更新信息时都训练或微调它们。
+
+By externalizing the knowledge of a model, [RAG can provide](https://cs.stanford.edu/~myasu/blog/racm3/) benefits such as:
+
+通过外部化模型的知识，[RAG可以提供](https://cs.stanford.edu/~myasu/blog/racm3/)诸如以下好处：
+
+* **Scalability**: reducing the model size and training cost, as well as allowing easy expansion of knowledge
+* **可扩展性**：减少模型大小和训练成本，以及允许轻松扩展知识
+
+* **Accuracy**: grounding the model to facts and reducing hallucinations
+* **准确性**：将模型锚定到事实并减少幻觉
+
+* **Controllability**: allowing updating or customizing the knowledge by simply performing CRUD operations in a vector DB
+* **可控性**：允许通过在向量数据库中简单执行CRUD操作来更新或自定义知识
+
+* **Interpretability**: retrieved documents serving as the reference to the source in model predictions
+* **可解释性**：检索到的文档作为模型预测中来源的参考
+
+However, the issue with text-only RAG systems is that they only leverage retrieved text source material. This is because most LLMs only understand language, and so any information that's retrieved had to be in text format … until now!
+
+然而，仅文本RAG系统的问题是它们只利用检索到的文本源材料。这是因为大多数LLMs只理解语言，因此检索到的任何信息都必须是文本格式...直到现在！
+
+Recently, a group of large generative models, both closed and open source, has emerged that understand both text and images. As a result, we can now support multimodal RAG, where we can retrieve images from our vector database and pass those into the large multimodal model (LMM) to generate with. This simple two-step process, illustrated below, is the main idea behind multimodal RAG.
+
+最近，一组理解文本和图像的大型生成模型已经出现，包括闭源和开源。因此，我们现在可以支持多模态RAG，我们可以从向量数据库检索图像并将这些传递给大语言多模态模型（LMM）进行生成。下面说明的这个简单的两步过程是多模态RAG背后的主要思想。
+
+Shows the two-step process of MM-RAG, involving retrieval from a multimodal knowledge base and then generation using a large multimodal model by grounding in the retrieved context.
+
+显示MM-RAG的两步过程，涉及从多模态知识库检索，然后通过基于检索上下文使用大型多模态模型进行生成。
+
+MM-RAG was [presented earlier this year](https://arxiv.org/abs/2211.12561) by a group at Stanford. They showed a workflow of multimodal models, one that could retrieve and another that could generate both text and images.
+
+MM-RAG由斯坦福的一个团队[在今年早些时候提出](https://arxiv.org/abs/2211.12561)。他们展示了多模态模型的工作流程，一个可以检索，另一个可以生成文本和图像。
+
+They also discussed the advantages of multimodal RAG:
+
+他们还讨论了多模态RAG的优势：
+
+* It significantly outperforms baseline multimodal models such as DALL-E and CM3 on both image and caption generation tasks.
+* 它在图像和标题生成任务上显著优于基线多模态模型，如DALL-E和CM3。
+
+* It requires much less compute while achieving better performance (&lt;30% of DALLE)
+* 它需要更少的计算，同时实现更好的性能（&lt;30%的DALLE）
+
+* MM-RAG capable models also generate images much more faithful to the retrieved context. This means the quality of the generated images is better and grounded in the retrieved context image.
+* 具备MM-RAG能力的模型也生成更忠实于检索上下文的图像。这意味着生成的图像质量更好，并以检索上下文图像为基础。
+
+* Multimodal models are capable of multimodal in-context learning (e.g., image generation from demonstrations). This means that we can feed any demonstration images and text so that the model generates an image that follows the visual characteristics of these in-context examples.
+* 多模态模型能够进行多模态上下文学习（如从演示生成图像）。这意味着我们可以输入任何演示图像和文本，以便模型生成一个遵循这些上下文示例视觉特征的图像。
+
+MM-RAG gives us a way to further control the awesome generative power of these new multimodal models to produce more useful results for use in industry.
+
+MM-RAG为我们提供了一种进一步控制这些新多模态模型的强大生成能力的方法，以产生更有用的工业应用结果。
+
+## Implementing a Multimodal RAG Example in Python
+## 在Python中实现多模态RAG示例
+
+This section demonstrates how you can implement a multimodal RAG system with a multimodal information retrieval system by retrieving from a multimodal collection and then stuffing a `base64` encoded image along with a text prompt to OpenAI's GPT4 vision model. We then take the generated description and pass it into DALL-E-3 to recreate the image from the description.
+
+本节演示如何通过从多模态集合检索，然后将`base64`编码的图像连同文本提示一起传递给OpenAI的GPT4视觉模型，来实现多模态信息检索系统的多模态RAG系统。然后我们获取生成的描述并将其传递给DALL-E-3以从描述重新创建图像。
+
+You can find the full code for this example in [this Jupyter notebook](https://github.com/weaviate-tutorials/multimodal-workshop/blob/main/2-multimodal/2-multimedia-rag.ipynb).
+
+您可以在[这个Jupyter笔记本](https://github.com/weaviate-tutorials/multimodal-workshop/blob/main/2-multimodal/2-multimedia-rag.ipynb)中找到这个例子的完整代码。
+
+### Retrieve an Object from a Multimodal Collection
+### 从多模态集合检索对象
+
+```python
+def retrieve_image(query):
+    response = animals.query.near_text(
+        query=query,
+        filters=wvc.query.Filter(path="mediaType").equal("image"),
+        return_properties=['name','path','mediaType','image'],
+        limit = 1,
+    )
+    result = response.objects[0].properties
+    print("Retrieved image object:",json.dumps(result, indent=2))
+    return result
+response = retrieve_image("dog with a sign")
+SOURCE_IMAGE = response['image']
+```
+
+**Retrieved Image:**
+**检索到的图像：**
+
+### Generate a Text Description of the Image
+### 生成图像的文本描述
+
+Next, we will generate a text description of the image by using OpenAI's GPT4-V vision language model.
+
+接下来，我们将使用OpenAI的GPT4-V视觉语言模型生成图像的文本描述。
+
+```python
+import requests
+def generate_description_from_image_gpt4(prompt, image64):
+  headers = {
+      "Content-Type": "application/json",
+      "Authorization": f"Bearer {openai.api_key}"
+  }
+  payload = {
+      "model": "gpt-4-vision-preview",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": prompt
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": f"data:image/jpeg;base64,{image64}" #base64 encoded image from Weaviate
+              }
+            }
+          ]
+        }
+      ],
+      "max_tokens": 300
+  }
+  response_oai = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+  result = response_oai.json()['choices'][0]['message']['content']
+  print(f"Generated description: {result}")
+  return result
+GENERATED_DESCRIPTION = generate_description_from_image_gpt4(
+    prompt="This is an image of my pet, please give me a cute and vivid description.",
+    image64=SOURCE_IMAGE)
+```
+
+**Generated description:** This adorable image captures a charming French Bulldog sitting obediently against a vibrant red background. The pup's coat is predominantly white with distinctive black patches around the ears and eyes, giving it a look of natural elegance. Its expressive, wide-set eyes gleam with a mix of curiosity and anticipation, while the slight tilt of its head and those perky bat-like ears contribute to an overall image of endearing attentiveness.
+
+**生成的描述：**这张可爱的图像捕捉了一只迷人的法国斗牛犬顺从地坐在充满活力的红色背景前的形象。小狗的皮毛主要是白色，在耳朵和眼睛周围有独特的黑色斑块，给它一种自然优雅的外观。它那双富有表现力、宽大的眼睛闪烁着好奇和期待的光芒，而它略微倾斜的头部和那些竖起的蝙蝠般的耳朵，为整幅图像增添了可爱的专注感。
+
+The cuteness is amplified by a handwritten sign hung around its neck with the words "FREE KISSES" and a little heart symbol, extending a sweet and whimsical offer to all who come near. The sign, coupled with the dog's innocent gaze, conjures up feelings of warmth and companionship. This tiny ambassador of affection sits proudly, almost as if understanding the joy it brings to those around it. With its compact size and affectionate demeanor, this little canine looks ready to dispense unlimited love and puppy kisses on demand.
+
+可爱程度被挂在脖子上的手写牌子放大，上面写着"FREE KISSES"和一个小心形符号，向所有靠近的人提供甜美而异想天开的提议。这个牌子连同狗狗天真的目光，唤起温暖和陪伴的感觉。这个小小的爱情大使自豪地坐着，几乎像理解它给周围的人带来的快乐一样。凭借其紧凑的尺寸和深情的举止，这只小狗看起来准备随时提供无限的爱和小狗之吻。
+
+### Use Text to Reconstruct the Image from DALL-E-3 (Diffusion Model):
+### 使用文本从DALL-E-3（扩散模型）重建图像：
+
+Currently, GPT4-V can't generate images. Therefore, we will use OpenAI's DALL-E-3 model instead:
+
+目前，GPT4-V无法生成图像。因此，我们将改用OpenAI的DALL-E-3模型：
+
+```python
+from openai import OpenAI
+def generate_image_dalee3(prompt):
+  openai_client = OpenAI()
+  response_oai = openai_client.images.generate(
+    model="dall-e-3",
+    prompt=str(prompt),
+    size="1024x1024",
+    quality="standard",
+    n=1,
+  )
+  result = response_oai.data[0].url
+  print(f"Generated image url: {result}")
+  return result
+image_url = generate_image_dalee3(GENERATED_DESCRIPTION)
+```
+
+**Generated Image:**
+**生成的图像：**
+
+## Recent Advancements in Multimodal RAG
+## 多模态RAG的最新进展
+
+Recent advancements in the retrieval mechanism with multimodal [late-interaction models](https://weaviate.io/blog/late-interaction-overview), such as ColPali, ColQwen, or ColQwen-Omni, as accelerated developments in multimodal RAG systems. In these modern AI systems, PDF documents are treated as multimodal documents that contain texts, images, tables, charts, etc.
+
+使用多模态[后期交互模型](https://weaviate.io/blog/late-interaction-overview)如ColPali、ColQwen或ColQwen-Omni在检索机制方面的最新进展，加速了多模态RAG系统的发展。在这些现代AI系统中，PDF文档被视为包含文本、图像、表格、图表等的多模态文档。
+
+For an example implementation, refer to [this notebook showcasing multimodal RAG on PDF documents using ColPali](https://github.com/weaviate/recipes/blob/main/weaviate-features/multi-vector/multi-vector-colipali-rag.ipynb)
+
+有关示例实现，请参考[这个使用ColPali在PDF文档上展示多模态RAG的笔记本](https://github.com/weaviate/recipes/blob/main/weaviate-features/multi-vector/multi-vector-colipali-rag.ipynb)
+
+## Conclusion
+## 结论
+
+In this blog, we covered how we can extend the concept of RAG to include retrieval from a multimodal knowledge base. We also explained how multimedia can be embedded into a unified vector space and consequently how we can leverage vector databases to power any-to-any search. I hope you found this article useful! I'd love to connect on **X** at [@zainhasan6](https://twitter.com/ZainHasan6)!
+
+在这篇博客中，我们涵盖了如何扩展RAG概念以包括从多模态知识库的检索。我们还解释了多媒体如何嵌入到统一的向量空间中，从而解释了如何利用向量数据库来支持任意到任意搜索。我希望您发现这篇文章有用！我很乐意在**X**上与您联系 [@zainhasan6](https://twitter.com/ZainHasan6)！
+
+## Ready to start building?
+## 准备开始构建？
+
+Check out the [Quickstart tutorial](https://docs.weaviate.io/weaviate/quickstart), or build amazing apps with a free trial of [Weaviate Cloud (WCD)](https://console.weaviate.cloud/).
+
+查看[快速入门教程](https://docs.weaviate.io/weaviate/quickstart)，或使用[Weaviate Cloud (WCD)](https://console.weaviate.cloud/)的免费试用版构建令人惊叹的应用程序。

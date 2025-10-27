@@ -1,0 +1,12 @@
+{
+  "title": "从零到一 RAG 实战（原创）",
+  "items": [
+    { "title": "概览与准备", "href": "index" },
+    { "title": "[1] 查询理解与转换", "href": "1-query-understanding-transformation" },
+    { "title": "[2] RAG融合与高级查询", "href": "2-rag-fusion-advanced-query" },
+    { "title": "[3] 路由与查询构建", "href": "3-routing-query-construction" },
+    { "title": "[4] 高级索引与检索策略", "href": "4-indexing-advanced-retrieval" },
+    { "title": "[5] 重排序与查询集成", "href": "5-reranking-ensemble" },
+    { "title": "参考资料", "href": "references" }
+  ]
+}

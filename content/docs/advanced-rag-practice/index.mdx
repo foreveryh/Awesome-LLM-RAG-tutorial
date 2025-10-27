@@ -1,0 +1,230 @@
+---
+title: 实践 Advanced RAG
+description: Advanced RAG 的实践应用和实现案例，从混合检索到智能体 RAG
+---
+
+# 实践 Advanced RAG
+
+欢迎来到 Advanced RAG 实践部分！本目录包含实际的实现案例和动手教程，帮助你将 RAG 理论转化为实际应用。
+
+## 学习路径
+
+建议按照以下顺序学习：
+
+1. **基础实践**：Milvus BM25 混合检索 - 掌握混合搜索的实现
+2. **模型实践**：Qwen3 模型实践 - 了解嵌入和重排序模型的应用
+3. **高级实践**：Elysia 智能体 RAG - 构建端到端的智能体系统
+
+---
+
+## 1. 混合检索实现
+
+### 1.1 [Milvus]通过 Milvus 的 BM25 算法进行全文检索并将混合检索应用于 RAG 系统
+[milvus-bm25-hybrid-retrieval](milvus-bm25-hybrid-retrieval)
+
+**技术栈：Milvus 2.5 + BM25 + DashScope** | **难度：中级** | **预计时间：45-60分钟**
+
+这是一篇非常实用的教程，展示了如何利用 Milvus 2.5 的最新功能实现混合检索。
+
+**本文亮点：**
+- 内置 Sparse-BM25 算法，无需额外预处理
+- 内置分词器（Analyzer），支持多语言
+- RRF (Reciprocal Rank Fusion) 算法融合结果
+- 完整的代码示例，可直接运行
+
+**你将学到：**
+1. 如何配置 Milvus 2.5 的 BM25 功能
+2. 如何设置分词器参数
+3. 如何创建同时支持密集向量和稀疏向量的 Schema
+4. 如何使用 RRF 算法融合混合检索结果
+5. 如何在 RAG 系统中应用混合检索
+
+**适用场景：**
+- 需要精确关键词匹配的场景
+- 中英文混合检索
+- 需要平衡语义搜索和关键词搜索的应用
+
+**前置知识：**
+- Python 基础
+- 向量数据库基本概念
+- BM25 算法基础（可阅读[深入 Advanced RAG](/docs/advanced-rag-deep-dive)目录中的相关文章）
+
+---
+
+## 2. Qwen3 模型实践
+
+### 2.1 [Qwen3]使用 Milvus 的 Qwen3 嵌入和重排序模型进行 RAG 实践
+[hands-on-rag-with-qwen3-embedding-and-reranking-models-using-milvus](hands-on-rag-with-qwen3-embedding-and-reranking-models-using-milvus)
+
+**技术栈：Qwen3-Embedding-0.6B + Qwen3-Reranker-0.6B + Milvus + OpenAI GPT-4** | **难度：中高级** | **预计时间：60-90分钟**
+
+这是一篇非常全面的教程，展示了如何使用阿里巴巴最新的 Qwen3 模型构建完整的 RAG 系统。
+
+**本文亮点：**
+- 使用开源的 Qwen3 模型，性能媒美商业 API
+- 完整的两阶段检索管道：密集检索 + 重排序
+- 详细的代码实现和解释
+- 支持多语言（100+ 语言）
+- 支持 32K 上下文长度
+
+**你将学到：**
+1. 如何设置 Qwen3 嵌入模型
+2. 如何配置 Qwen3 重排序模型
+3. 如何实现两阶段检索管道：
+   - 阶段1：使用嵌入模型进行快速候选选择
+   - 阶段2：使用重排序模型精确排序
+4. 如何将检索结果与 LLM 集成
+5. 如何优化检索参数（top_k、rerank_top_k）
+
+**Qwen3 模型的优势：**
+- **多语言支持**：统一的语义空间，跨语言检索
+- **指令提示**：可自定义指令来调整嵌入行为
+- **可变维度**：支持 Matryoshka Representation Learning
+- **长上下文**：32K token 支持
+
+**适用场景：**
+- 多语言 RAG 系统
+- 需要高精度检索的场景
+- 中文为主的应用
+- 需要开源方案的项目
+
+**前置知识：**
+- Python 和 Transformers 库
+- 向量检索基础
+- 重排序模型原理（建议阅读[深入 Advanced RAG](/docs/advanced-rag-deep-dive/huggingface-train-reranker)）
+
+---
+
+## 3. 智能体 RAG 实现
+
+### 3.1 [Weaviate][Elysia]使用 Elysia 构建端到端的智能体 RAG 应用
+[elysia-agentic-rag-bilingual](elysia-agentic-rag-bilingual)
+
+**技术栈：Elysia + Weaviate + DSPy + FastAPI** | **难度：高级** | **预计时间：90-120分钟**
+
+这是一篇前沿的教程，介绍了 Weaviate 的开源智能体 RAG 框架 Elysia。这不仅仅是一个 RAG 系统，而是一个具有自主决策能力的智能体系统。
+
+**本文亮点：**
+- 基于决策树的智能体架构
+- 动态数据显示类型（图表、图像、表格等）
+- AI 数据分析和意识
+- 完整的 Web 界面
+- 开源且高度可定制
+
+**Elysia 的三大支柱：**
+
+#### 1. 可定制的决策树架构
+- 动态决定使用什么工具
+- 完全透明的决策过程
+- 可实时查看决策树
+
+#### 2. 动态数据显示类型
+不仅仅返回文本，还可以：
+- 显示交互式图表
+- 展示图像画廊
+- 显示结构化表格
+- 显示地图和时间线
+
+#### 3. AI 数据分析和意识
+Elysia 不仅检索数据，还会主动分析：
+- 自动生成属性描述
+- 生成数据集摘要
+- 推荐示例查询
+- 推荐显示类型
+
+**实际案例：Glowe 护肤应用**
+
+文章中还介绍了如何使用 Elysia 构建 Glowe 护肤电商应用，包括：
+- 查询代理工具
+- 产品集合生成工具
+- 相似产品推荐工具
+
+**你将学到：**
+1. 如何安装和配置 Elysia
+2. 如何连接 Weaviate 集群
+3. 如何分析和理解你的数据
+4. 如何使用决策树进行智能检索
+5. 如何自定义工具和决策节点
+6. 如何将 Elysia 集成到你的应用中
+
+**快速开始：**
+```bash
+pip install elysia-ai
+elysia start
+```
+
+**适用场景：**
+- 需要复杂决策逻辑的 RAG 系统
+- 多模态数据显示
+- 需要透明性和可解释性的场景
+- 客户服务聊天机器人
+- 研究助手
+- 数据分析工具
+
+**前置知识：**
+- Python 和 FastAPI
+- Weaviate 基础
+- DSPy 框架（可选）
+- 智能体系统概念（建议阅读[初识 Advanced RAG](/docs/advanced-rag-intro/what-is-agentic-rag-bilingual)）
+
+---
+
+## 学习建议
+
+### 对于初学者：
+
+1. **先学理论**：
+   - 阅读[初识 Advanced RAG](/docs/advanced-rag-intro)目录
+   - 阅读[深入 Advanced RAG](/docs/advanced-rag-deep-dive)中的基础文章
+
+2. **从简单开始**：
+   - 先实践 Milvus BM25 混合检索
+   - 掌握基本的混合搜索实现
+
+3. **进阶实践**：
+   - 尝试 Qwen3 模型实践
+   - 了解两阶段检索管道
+
+4. **高级应用**：
+   - 最后学习 Elysia 智能体 RAG
+   - 尝试自定义工具和决策逻辑
+
+### 对于有经验的开发者：
+
+1. **直接实践**：根据需求选择相应教程
+2. **技术选型**：
+   - 如果需要开源方案 → Qwen3
+   - 如果需要混合检索 → Milvus BM25
+   - 如果需要智能体系统 → Elysia
+3. **集成应用**：将这些技术集成到你的项目中
+
+### 对于企业级应用：
+
+**技术选型指南：**
+
+| 需求 | 推荐方案 | 原因 |
+|------|----------|------|
+| 多语言支持 | Qwen3 | 内置 100+ 语言支持 |
+| 关键词精确匹配 | Milvus BM25 | BM25 算法优秀 |
+| 复杂决策逻辑 | Elysia | 决策树架构 |
+| 需要可解释性 | Elysia | 透明的决策过程 |
+| 多模态显示 | Elysia | 动态显示类型 |
+| 高性能检索 | Qwen3 + Milvus | 两阶段检索 |
+
+---
+
+## 进一步学习
+
+完成这些实践后，建议：
+
+1. **回顾理论**：重新阅读[深入 Advanced RAG](/docs/advanced-rag-deep-dive)中的优化策略
+2. **比较分析**：尝试不同技术的性能对比
+3. **自定义开发**：基于这些案例开发自己的 RAG 系统
+4. **关注最新发展**：持续关注 RAG 技术的最新进展
+
+## 社区资源
+
+- **Milvus**：[Milvus 官方文档](https://milvus.io/docs)
+- **Qwen3**：[Qwen3 GitHub](https://github.com/QwenLM/Qwen3)
+- **Elysia**：[Elysia GitHub](https://github.com/weaviate/elysia)
+- **Weaviate**：[Weaviate 官方文档](https://docs.weaviate.io/)

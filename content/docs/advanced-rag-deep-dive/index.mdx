@@ -1,0 +1,368 @@
+---
+title: 深入 Advanced RAG
+description: 深入理解 Advanced RAG 的核心概念、优化策略和实现原理
+---
+
+# 深入 Advanced RAG
+
+欢迎来到 Advanced RAG 深入学习部分。本目录包含深入理解 RAG 技术的核心概念、优化策略和实现细节的文章。
+
+## 学习路径
+
+建议按照以下顺序学习：
+
+### 阶段 1：基础框架（必读）
+1. 向量搜索详解 - 理解 RAG 的技术基础
+2. 构建高质量的 RAG 系统 - 掌握整体架构
+3. Advanced RAG 架构 - 了解高级架构设计
+
+### 阶段 2：问题诊断
+4. 为什么 RAG 管道会失败 - 识别常见问题
+
+### 阶段 3：优化策略（核心）
+5. 如何提高 RAG 性能 - 全面的优化指南
+6. Advance RAG: Improve RAG Performance - 实用优化技巧
+7. 生产就绪的 RAG 应用程序的 12 种调优策略 - 系统化调优
+
+### 阶段 4：核心技术
+8. 文本分块策略 - 数据预处理
+9. HyDE 假设性文档嵌入 - 检索增强技术
+10. 多模态 RAG - 处理图像和文本
+
+### 阶段 5：高级检索技术
+11. 重排序模型训练
+12. 混合搜索与稀疏编码
+13. Graph RAG - 知识图谱增强
+
+---
+
+## 1. 核心概念与架构
+
+### 1.1 [向量]向量搜索详解
+[vector-search-explained](vector-search-explained)
+
+**优先级：高** | **难度：基础** | **预计阅读时间：40-50分钟**
+
+向量搜索是 RAG 系统的技术基础。本文深入介绍：
+- 什么是向量搜索及其工作原理
+- 向量嵌入（Vector Embeddings）的概念
+- kNN 和 ANN 算法的区别
+- 不同的 ANN 算法：HNSW、ANNOY、FAISS 等
+- Python 从头实现向量搜索的示例
+- 向量数据库的优势
+
+这是理解 RAG 技术栈的必读文章，包含中英文对照。
+
+### 1.2 [推荐]构建高质量的 RAG 系统
+[building-high-quality-rag-systems](building-high-quality-rag-systems)
+
+**优先级：高** | **难度：中级** | **预计阅读时间：50-60分钟**
+
+从系统工程的角度介绍如何构建高质量的 RAG 系统。本文涵盖：
+- RAG 系统的两个核心阶段：索引和生成
+- 数据加载器的设计与实现
+- 数据格式化的最佳实践
+- 文本分割策略：基于规则 vs 基于 ML
+- 嵌入模型的选择
+- **特别关注非英语语言的实现细节**
+
+本文的独特之处在于提供了多语言 RAG 系统的实践指导。
+
+### 1.3 [架构]Advanced RAG 架构
+[advanced-rag-architecture](advanced-rag-architecture)
+
+**优先级：中** | **难度：中高级** | **预计阅读时间：30-40分钟**
+
+Advanced RAG 的架构设计和模式详解。
+
+### 1.4 [技术]Advanced RAG Techniques
+[advanced-rag](advanced-rag)
+
+**优先级：高** | **难度：中级** | **预计阅读时间：30-40分钟**
+
+来自 Weaviate 的实用 RAG 优化技巧。本文涵盖：
+
+**索引阶段优化：**
+- 分块技术：简单分块、语义分块、基于 LLM 的分块
+- 元数据利用：添加和过滤元数据
+- 使用 GLiNER 生成元数据
+
+**检索阶段优化：**
+- 混合搜索（Hybrid Search）
+- 查询重写（Query Rewriting）
+- 微调嵌入模型
+
+**生成阶段优化：**
+- Autocut 去除无关信息
+- 重排序（Reranking）
+- 微调 LLM
+
+本文以医疗聊天机器人为例，展示了实际应用中的优化策略。
+
+---
+
+## 2. 问题诊断与故障分析
+
+### 2.1 [故障分析]为什么 RAG 管道会失败？
+[why-rag-pipelines-fail](why-rag-pipelines-fail)
+
+**优先级：高** | **难度：中级** | **预计阅读时间：20-30分钟**
+
+深入分析 RAG 管道失败的核心原因。本文将问题分为三大类：
+
+**a) 检索问题：**
+- 语义歧义（Semantic Ambiguity）
+- 向量空间密度问题
+- 粒度不匹配（Granularity Mismatch）
+- 稀疏检索挑战
+
+**b) 增强问题：**
+- 上下文难以整合
+- 冗余和重复
+- 排名与优先级问题
+- 风格和语气不匹配
+- 过度依赖检索内容
+
+**c) 生成问题：**
+- LLM 相关问题：幻觉、错误信息、上下文长度限制
+- 连贯性和一致性问题
+- 冗余和过度泛化
+- 缺乏深度和洞察
+
+这是高级 RAG 模式系列的第 1 部分，帮助开发者识别和诊断系统问题。
+
+---
+
+## 3. 优化策略（核心内容）
+
+### 3.1 [综合]如何提高 RAG 性能
+[how-to-improve-rag-performance](how-to-improve-rag-performance)
+
+**优先级：极高** | **难度：中高级** | **预计阅读时间：30-40分钟**
+
+高级 RAG 模式系列的第 2 部分，从多个维度详细介绍了如何提高 RAG 性能。
+
+**1. 数据优化：**
+- 文本清理与标准化
+- 实体解析（Entity Resolution）
+- 数据去重
+- 文档分割
+- 领域特定注释
+- 数据增强
+- 层次结构与关系
+- 用户反馈循环
+
+**2. 嵌入优化：**
+- 微调嵌入模型（如 BGE 模型）
+- 动态嵌入（Dynamic Embeddings）
+- 刷新嵌入
+
+**3. 检索优化：**
+- 调整分块大小
+- 元数据嵌入
+- 查询路由（Query Routing）
+- 多向量检索
+- 重排序（Re-ranking）
+- 混合搜索
+- 递归检索
+- HyDE 方法
+- "Read Retrieve Read" / ReAct
+- 向量搜索算法调优
+
+这是一篇全面的优化指南，非常值得深入学习。
+
+### 3.2 [Weaviate]Advance RAG: Improve RAG Performance
+[advance-rag-improve-rag-performance](advance-rag-improve-rag-performance)
+
+**优先级：高** | **难度：中级** | **预计阅读时间：30-40分钟**
+
+从 Weaviate 团队的实践经验出发，介绍 RAG 管道优化。本文按照 RAG 流程的三个阶段组织：
+
+**预检索优化：**
+- 数据粒度增强
+- 元数据添加
+- 索引结构优化
+
+**检索优化：**
+- 查询重写
+- 嵌入微调
+- 混合搜索探索
+
+**后检索优化：**
+- 重排序
+- 提示压缩
+
+还介绍了模块化 RAG 和 RAG 融合等高级技术。
+
+### 3.3 [必读]生产就绪的 RAG 应用程序的 12 种调优策略
+[rag-tuning-strategies](rag-tuning-strategies)
+
+**优先级：极高** | **难度：中高级** | **预计阅读时间：40-50分钟**
+
+从数据科学家的角度审视 RAG 管道，将 RAG 系统的各个方面视为可调优的"超参数"。
+
+**摄取阶段的 6 个调优点：**
+1. 数据清理
+2. 分块（Chunking）
+3. 嵌入模型
+4. 元数据
+5. 多索引（Multi-indexing）
+6. 索引算法
+
+**推理阶段的 6 个调优点：**
+1. 查询转换（Query Transformations）
+2. 检索参数
+3. 高级检索策略
+4. 重排序模型
+5. LLM 选择
+6. 提示工程
+
+这是一篇非常系统化的文章，对于构建生产级 RAG 应用至关重要。
+
+---
+
+## 4. 核心技术深入
+
+### 4.1 [文本处理]文本分块策略
+[text-chunking-strategies](text-chunking-strategies)
+
+**优先级：高** | **难度：中级** | **预计阅读时间：20-30分钟**
+
+文本分块是 RAG 系统中最关键的步骤之一。本文介绍了 5 个等级的分块策略：
+
+**Level 1: 固定大小分块**
+- 最简单的方法
+- 按固定字符数分割
+
+**Level 2: 递归分块**
+- 使用多个分隔符
+- 分层迭代分割
+
+**Level 3: 基于文档的分块**
+- Markdown 文档
+- Python/JS 代码
+- 表格和图像（多模态）
+
+**Level 4: 语义分块**
+- 基于嵌入相似度
+- 保持语义相似的内容在一起
+
+**Level 5: Agentic 分块**
+- 使用 LLM 决定分块
+- 基于 Propositions 的方法
+
+包含 Greg Kamradt 的视频教程链接。
+
+### 4.2 [HyDE]HyDE 假设性文档嵌入
+[hyde-hypothetical-document-embeddings](hyde-hypothetical-document-embeddings)
+
+**优先级：中** | **难度：中高级** | **预计阅读时间：35-45分钟**
+
+HyDE 是一种创新的检索增强技术。本文深入介绍：
+- HyDE 的基本原理：生成假设性回答
+- 为什么假设性回答比查询更接近目标文档
+- HyDE 在不同任务上的表现
+- 实现细节和代码示例
+- 优势与局限性
+
+### 4.3 [多模态]Multimodal RAG
+[multimodal-rag](multimodal-rag)
+
+**优先级：中** | **难度：高级** | **预计阅读时间：30-40分钟**
+
+介绍如何处理图像、表格和文本的多模态 RAG 系统。
+
+### 4.4 [索引]通过三种索引方法改进 RAG 流水线
+[improving-rag-pipeline-with-three-indexing-methods](improving-rag-pipeline-with-three-indexing-methods)
+
+**优先级：中** | **难度：中级** | **预计阅读时间：15-20分钟**
+
+介绍三种不同的索引方法来改善检索质量。
+
+---
+
+## 5. 重排序与混合搜索
+
+### 5.1 [重排序]使用 HuggingFace 训练重排序模型
+[huggingface-train-reranker](huggingface-train-reranker)
+
+**优先级：中** | **难度：中高级** | **预计阅读时间：30-40分钟**
+
+详细介绍如何训练自定义的重排序模型。
+
+### 5.2 [混合搜索]PostgreSQL 混合搜索
+[postgres-hybrid-search](postgres-hybrid-search)
+
+**优先级：中** | **难度：中高级** | **预计阅读时间：40-50分钟**
+
+使用 PostgreSQL 实现混合搜索（语义搜索 + 关键词搜索）。
+
+### 5.3 [稀疏编码]SPLADE 模型详解
+
+- [pinecone-splade](pinecone-splade) - Pinecone SPLADE 稀疏编码器
+- [splade-sparse-bi-encoder-bert-model](splade-sparse-bi-encoder-bert-model) - SPLADE 稀疏双编码器 BERT 模型
+
+**优先级：低** | **难度：高级** | **预计阅读时间：30-40分钟**
+
+SPLADE 是一种结合稀疏和密集检索的技术。
+
+---
+
+## 6. 特定数据库实现
+
+### 6.1 向量数据库实现
+
+#### [Pinecone]分块策略
+[pinecone-chunking-strategies](pinecone-chunking-strategies)
+
+**优先级：中** | **难度：中级**
+
+在 Pinecone 向量数据库中实现分块策略。
+
+#### [Elasticsearch]RRF 算法详解
+[elasticsearch-rrf](elasticsearch-rrf)
+
+**优先级：低** | **难度：中高级**
+
+Elasticsearch 中的 Reciprocal Rank Fusion (RRF) 算法。
+
+### 6.2 图数据库实现
+
+#### [Neo4j]Neo4j RAG 教程
+[neo4j-rag-tutorial](neo4j-rag-tutorial)
+
+**优先级：中** | **难度：中高级** | **预计阅读时间：50-60分钟**
+
+使用 Neo4j 图数据库构建 RAG 系统的完整教程。
+
+#### [Graph]Exploring RAG and GraphRAG
+[graph-rag-bilingual](graph-rag-bilingual)
+
+**优先级：中** | **难度：中高级** | **预计阅读时间：40-50分钟**
+
+英中对照版，探讨 RAG 和 GraphRAG 的区别和适用场景。
+
+---
+
+## 学习建议
+
+### 对于初学者：
+
+1. **基础知识**：先阅读「初识 Advanced RAG」目录
+2. **技术基础**：向量搜索详解 → 构建高质量的 RAG 系统
+3. **问题诊断**：为什么 RAG 管道会失败
+4. **优化学习**：按顺序阅读三篇优化文章
+5. **核心技术**：学习分块、HyDE 等具体技术
+6. **实践应用**：查看「实践 Advanced RAG」目录
+
+### 对于进阶学习者：
+
+1. **直接学习**：三篇优化文章（必读）
+2. **技术深入**：根据需要选择具体技术深入
+3. **数据库实现**：根据使用的数据库选择相应文章
+
+### 对于专家级开发者：
+
+- 重点关注：生产就绪的 12 种调优策略
+- 根据业务需求选择高级技术
+- 关注多模态、Graph RAG 等前沿技术

@@ -1,0 +1,308 @@
+---
+title: Exploring RAG and GraphRAG - Understanding when and how to use both (英中对照版)
+description: Learn about the differences between traditional RAG and GraphRAG, and when to use each approach for better retrieval performance. 了解传统 RAG 和 GraphRAG 之间的区别，以及何时使用每种方法来获得更好的检索性能。
+---
+
+# Exploring RAG and GraphRAG: Understanding when and how to use both / 探索 RAG 和 GraphRAG：了解何时以及如何使用它们
+
+Retrieval Augmented Generation (RAG) is an effective way to get AI to extract information from the specific set of data you want it to work with. The idea is relatively simple - although generative LLMs are amazing at what they do, they don't know everything. So if we want an LLM to generate a response based on specific information in our documents, we have to provide it with that information (context) first.
+
+检索增强生成 (RAG) 是让 AI 从您希望其处理的特定数据集中提取信息的有效方法。这个想法相对简单 - 尽管生成式大语言模型在它们所做的事情上很出色，但它们并非无所不知。因此，如果我们希望大语言模型根据我们文档中的特定信息生成响应，我们必须首先提供这些信息（上下文）。
+
+RAG is the solution to that problem, and has become pretty much ubiquitous for most knowledge base search systems we see out in the wild today. What more can you need? In this article we want to highlight that your data and what it looks like, as well as the valuable information in your data, may dictate what kind of RAG is most effective for it.
+
+RAG 是解决这个问题的方案，并且对于我们在今天看到的大多数知识库搜索系统来说已经变得几乎无处不在。您还需要什么更多呢？在本文中，我们想强调您的数据及其外观，以及您数据中的有价值信息，可能会决定哪种 RAG 对它最有效。
+
+While in many cases the relevant context may be found in the content of our data, there are applications where additional information can help improve performance of a RAG application. Graph RAG, for example, allows for context to be retrieved based on relations between data points in our database. With the combination of vector search based RAG and Graph RAG in a hybrid RAG system, we can return results not only on their contextual meaning, but also based on the relationships within our data. To help you understand the difference between the two approaches, we've also created a recipe that you can run with Colab.
+
+虽然在许多情况下，相关上下文可以在我们数据的内容中找到，但也有一些应用程序可以通过额外信息来帮助提高 RAG 应用程序的性能。例如，Graph RAG 允许根据数据库中数据点之间的关系来检索上下文。在混合 RAG 系统中结合基于向量搜索的 RAG 和 Graph RAG，我们可以不仅根据其上下文含义返回结果，还可以根据我们数据中的关系返回结果。为了帮助您理解这两种方法之间的区别，我们还创建了一个可以在 Colab 中运行的配方。
+
+:::note
+🧑‍🍳 This blog comes with an accompanying recipe and helper functions which can all be found in the [`ms-graphrag-neo4j` repository](https://github.com/neo4j-contrib/ms-graphrag-neo4j/). You can also open the specific "Naive RAG vs GraphRAG with Neo4J & Weaviate" recipe as a Colab [here](https://colab.research.google.com/github/neo4j-contrib/ms-graphrag-neo4j/blob/main/examples/neo4j_weaviate_combined.ipynb)
+:::
+
+:::note
+🧑‍🍳 本博客附带了一个配方和辅助函数，都可以在 [`ms-graphrag-neo4j` 仓库](https://github.com/neo4j-contrib/ms-graphrag-neo4j/)中找到。您也可以在这里以 Colab 形式打开特定的"简单 RAG 与 GraphRAG 使用 Neo4J 和 Weaviate"配方 [here](https://colab.research.google.com/github/neo4j-contrib/ms-graphrag-neo4j/blob/main/examples/neo4j_weaviate_combined.ipynb)
+:::
+
+## What is RAG & what is it good at / 什么是 RAG 及其优势
+
+RAG stands for "[Retrieval Augmented Generation](https://weaviate.io/blog/introduction-to-rag)". Let's zone in on the first word there: retrieval. The first step in getting an LLM to respond to something based on some specific context is to retrieve that relevant context in the first place.
+
+RAG 代表"[检索增强生成](https://weaviate.io/blog/introduction-to-rag)"。让我们专注于第一个词：检索。让大语言模型基于某些特定上下文进行响应的第一步是首先检索到相关的上下文。
+
+### What is Naive RAG? / 什么是简单 RAG？
+
+Retrieving context can be done in many many ways, but by far the most common way is to do semantic search (vector search) over a given set of data. This brings us to the term "Naive RAG", which is simply a basic question-answer system with vector search based retrieval. Within most RAG systems, the "R" (retrieval) is based on vector search. This allows us to use of the semantic meaning of a query and extract the most relevant data based on that meaning, using embedding models to encode both the user query and all the data we may have stored somewhere (vector databases like Weaviate that are designed to do just this).
+
+检索上下文可以通过许多方式完成，但到目前为止最常见的方法是对给定数据集进行语义搜索（向量搜索）。这引出了"简单 RAG"这个术语，它只是一个基于向量搜索检索的基本问答系统。在大多数 RAG 系统中，"R"（检索）基于向量搜索。这使我们能够利用查询的语义含义，并基于该含义提取最相关的数据，使用嵌入模型对用户查询和我们可能存储在某处的所有数据进行编码（像 Weaviate 这样的向量数据库就是为此而设计的）。
+
+Because of the fundamental nature of Naive RAG, it's a great way of retrieving relevant context for any given query, which can then be used by an LLM to generate a response. Most datasets that include embeddings used for Naive RAG contain a list of "text" fields, and for each of them, we have an embedding:
+
+由于简单 RAG 的基本性质，它是为任何给定查询检索相关上下文的绝佳方式，然后可以由大语言模型使用这些上下文生成响应。大多数包含用于简单 RAG 的嵌入的数据集都包含"文本"字段列表，对于每个字段，我们都有一个嵌入：
+
+An important thing to notice is that each entry is an independent entry. Each entry has meaning that can be represented by a vector (embedding). So, the only information Naive RAG has access to are the independent vectors for each entry. This way of representing data doesn't represent any relationships between data points beyond the proximity of their meaning in vector space.
+
+需要注意的一点是，每个条目都是独立的条目。每个条目都有可以用向量（嵌入）表示的含义。因此，简单 RAG 能访问的唯一信息是每个条目的独立向量。这种表示数据的方式不会表示数据点之间除了在向量空间中含义接近度之外的任何关系。
+
+Take the example in our recipe. Here, we'll be showcasing RAG over a dataset that includes (fake) contracts (such as partnerships, employment etc) that were signed between individuals and companies. For each contract, we have the `contract_text`, `author` and `contract_type`. We then go ahead and vectorize all of this information, where each contract has one vector representing its meaning.
+
+以我们配方中的示例为例。这里，我们将在一个包含（虚构的）合同（如合伙协议、雇佣合同等）的数据集上展示 RAG，这些合同是个人和公司之间签署的。对于每份合同，我们有 `contract_text`、`author` 和 `contract_type`。然后我们继续将所有这些信息向量化，其中每份合同都有一个代表其含义的向量。
+
+When we ask a question about the data, it does a great job at fetching the most relevant contracts to the question we just asked.
+
+当我们询问有关数据的问题时，它在获取与我们刚刚提出的问题最相关的合同时表现出色。
+
+### Where Naive RAG is not enough / 简单 RAG 的不足之处
+
+Now, in most cases the so-called relationships between data points may not be so relevant to any given search task. But with these contracts, you can probably already start to imagine that something that encodes relationships might be super valuable. For example, for each contract we retrieve, we know the author, but our retrieved context does not encode further information such as whether the person the author has signed a contract with has relationships to yet other authors. With that in mind, let's move on to Graph RAG 👇
+
+现在，在大多数情况下，数据点之间所谓的关系统计对任何给定的搜索任务可能并不那么相关。但是对于这些合同，您可能已经可以开始想象编码关系的东西可能非常有价值。例如，对于我们检索到的每份合同，我们知道作者，但我们的检索上下文并没有编码进一步的信息，比如作者签约的人是否与其他作者有关联。考虑到这一点，让我们继续讨论 Graph RAG 👇
+
+## What is GraphRAG? / 什么是 GraphRAG？
+
+GraphRAG has recently become an umbrella term referring broadly to RAG approaches where the retrieval component specifically leverages knowledge graphs. Under this umbrella, numerous methods have emerged, each differing in how they utilize graph-based retrieval to enhance LLM responses (learn more [here](https://graphrag.com/)).
+
+GraphRAG 最近成为一个总称，广泛指代检索组件专门利用知识图谱的 RAG 方法。在这个总称下，出现了许多方法，每种方法在如何利用基于图谱的检索来增强大语言模型响应方面都有所不同（在[这里](https://graphrag.com/)了解更多）。
+
+Among these, the [GraphRAG implementation from Microsoft](https://microsoft.github.io/graphrag/) has risen as one of the most popular and widely-adopted approaches.
+
+其中，[微软的 GraphRAG 实现](https://microsoft.github.io/graphrag/)已成为最流行和广泛采用的方法之一。
+
+Microsoft's GraphRAG (MS GraphRAG) enhances knowledge graph construction by leveraging an LLM in a two-stage process. In the initial stage, entities and relationships are extracted and summarized from source documents, laying the foundation for the knowledge graph, as depicted in the pipeline illustration above.
+
+微软的 GraphRAG (MS GraphRAG) 通过在两阶段过程中利用大语言模型来增强知识图谱构建。在初始阶段，从源文档中提取和总结实体和关系，为知识图谱奠定基础，如上面的流水线图所示。
+
+### How GraphRAG Extends Naive RAG Capabilities / GraphRAG 如何扩展简单 RAG 的能力
+
+What sets MS GraphRAG apart from naive RAG is its ability to detect graph communities and generate domain-specific summaries for groups of closely related entities once the knowledge graph is constructed. This layered approach integrates fragmented information from various text sources into a cohesive and organized representation of entities, relationships, and communities.
+
+MS GraphRAG 与简单 RAG 的区别在于，一旦知识图谱构建完成，它能够检测图谱社区并为密切相关的实体组生成特定领域的摘要。这种分层方法将来自各种文本源的碎片化信息整合成实体、关系和社区的内聚且有组织的表示。
+
+The resulting entity- and community-level summaries can be used to provide relevant information in response to user queries within a RAG application. Additionally, the structured knowledge graph enables the application of multiple retrieval approaches, such as a combination of graph search and vector search together, enhancing the overall search and retrieval experience
+
+生成的实体级和社区级摘要可用于在 RAG 应用程序中响应用户查询时提供相关信息。此外，结构化的知识图谱支持应用多种检索方法，例如图谱搜索和向量搜索的组合，从而增强整体搜索和检索体验
+
+## Implementing GraphRAG with Neo4j / 使用 Neo4j 实现 GraphRAG
+
+For this blog post, we've developed a streamlined [Python project](https://github.com/neo4j-contrib/ms-graphrag-neo4j/tree/main/src/ms_graphrag_neo4j) that encapsulates all the prompts to avoid overwhelming you with extensive code. While this implementation is a proof-of-concept rather than production-ready code, it provides a practical demonstration. You can easily initialize a Neo4j driver and pass it to this simplified Ms Graph RAG implementation to see the concepts in action.
+
+对于这篇博客文章，我们开发了一个简化的 [Python 项目](https://github.com/neo4j-contrib/ms-graphrag-neo4j/tree/main/src/ms_graphrag_neo4j)，它封装了所有提示，以避免用大量代码让您感到不知所措。虽然这个实现是一个概念验证而不是生产就绪的代码，但它提供了一个实际的演示。您可以轻松初始化一个 Neo4j 驱动程序并将其传递给这个简化的 Ms Graph RAG 实现，以查看概念的实际效果。
+
+### Extracting Entities and Relations / 提取实体和关系
+
+We use the same dummy [financial dataset](https://huggingface.co/datasets/weaviate/agents/viewer/query-agent-financial-contracts) as we used in the baseline RAG implementation. This dataset comprises 100 contracts involving various parties. For MS GraphRAG method, the most critical configuration decision involves specifying which entity types should be extracted and summarized, as this selection fundamentally shapes all downstream results. Given our focus on contracts, we prioritize the extraction of key entity categories including Person, Organization, and Location.
+
+我们使用与基线 RAG 实现中相同的虚拟[金融数据集](https://huggingface.co/datasets/weaviate/agents/viewer/query-agent-financial-contracts)。该数据集包含涉及各方的 100 份合同。对于 MS GraphRAG 方法，最关键的配置决策是指定应提取和总结哪些实体类型，因为此选择从根本上塑造了所有下游结果。鉴于我们专注于合同，我们优先提取关键实体类别，包括人员、组织和位置。
+
+```
+allowed_entities = ["Person", "Organization", "Location"]
+await ms_graph.extract_nodes_and_rels(texts, allowed_entities)
+```
+
+After the results we should have the following results:
+
+在结果之后，我们应该有以下结果：
+
+The purple node is the contract that contains its text and metadata, while the green nodes represent extracted entities. Each entity has a name and description, and they can have multiple relationships between each other, as shown in the above image.
+
+紫色节点是包含其文本和元数据的合同，而绿色节点代表提取的实体。每个实体都有名称和描述，它们之间可以有多个关系，如上图所示。
+
+When an entity is mentioned in multiple contracts, it will have multiple descriptions, as it gets one description per contract. Similarly, there can be multiple relationships between entities if they appear in multiple chunks. To consolidate the information, the implementation proceeds with entity and relationship summarization, where we use an LLM to generate concise summaries and resolve duplicates or redundant information.
+
+当一个实体在多个合同中被提及，它将有多个描述，因为每个合同都会有一个描述。同样，如果实体出现在多个块中，它们之间可能存在多个关系。为了整合信息，实现继续进行实体和关系总结，我们使用大语言模型生成简洁的摘要并解决重复或冗余信息。
+
+```
+await ms_graph.summarize_nodes_and_rels()
+```
+
+Results are:
+
+结果是：
+
+The revised model now displays a single consolidated relationship between entities, containing summarized information from all input sources. Furthermore, each entity receives a comprehensive summary, which can be quite detailed, as evidenced by the extensive profile generated for Danny Williams.
+
+修订后的模型现在显示实体之间的单一整合关系，包含来自所有输入源的摘要信息。此外，每个实体都会收到一个全面的摘要，这可能非常详细，正如为 Danny Williams 生成的广泛档案所证明的那样。
+
+In the final phase of the indexing process, we employ graph algorithms, specifically the Leiden algorithm, to identify communities within the network. These communities represent clusters of densely interconnected nodes that exhibit stronger connections among themselves than with the rest of the graph.
+
+在索引过程的最后阶段，我们采用图谱算法，特别是 Leiden 算法，来识别网络中的社区。这些社区代表密集互连的节点簇，它们之间表现出比与图谱其余部分更强的连接。
+
+Communities are distinguished by entity color in this visualization. This illustrates how densely interconnected nodes naturally cluster to form communities.
+
+在这个可视化中，社区通过实体颜色来区分。这说明了密集互连的节点如何自然地聚集形成社区。
+
+The idea behind MS GraphRAG is to generate comprehensive high-level summaries that span multiple relationships and nodes. This provides a more holistic overview by synthesizing interconnected information into a cohesive picture.
+
+MS GraphRAG 背后的理念是生成涵盖多个关系和节点的全面高级摘要。这通过将互连信息综合成一个内聚的画面来提供更全面的概述。
+
+```
+await ms_graph.summarize_communities()
+```
+
+With a knowledge graph constructed, we can move onto the retrieval part.
+
+构建了知识图谱后，我们可以进入检索部分。
+
+## Hybrid Local Graph & Vector Search / 混合本地图谱和向量搜索
+
+There are multiple effective methods for retrieving information from a knowledge graph. The Microsoft GraphRAG team demonstrates [three distinct approaches](https://microsoft.github.io/graphrag/query/overview/):
+
+1.   Global search
+2.   Local search
+3.   DRIFT search
+
+从知识图谱中检索信息有多种有效方法。微软 GraphRAG 团队展示了[三种不同的方法](https://microsoft.github.io/graphrag/query/overview/)：
+
+1.   全局搜索
+2.   本地搜索
+3.   DRIFT 搜索
+
+The local search approach generates responses by intelligently merging information from the AI-extracted knowledge graph with relevant text segments from the source documents. Local search is particularly effective for questions that require detailed understanding of specific entities or concepts documented in the corpus (e.g., "What therapeutic benefits does lavender oil provide?").
+
+本地搜索方法通过智能地将来自 AI 提取的知识图谱的信息与源文档中的相关文本段落合并来生成响应。本地搜索对于需要详细了解语料库中记录的特定实体或概念的问题特别有效（例如，"薰衣草油提供什么治疗益处？"）。
+
+Local search is a retrieval and response generation method that works by finding the most relevant information in your document collection based on specific entities mentioned in a user's question. Here's how it works:
+
+1.   Entity Recognition: When a user asks a question, the system identifies key entities (people, places, concepts, etc.) that are semantically related to the query.
+
+2.   Knowledge Graph Navigation: These identified entities act as entry points into your knowledge graph, allowing the system to:
+
+*   Find connected entities (relationships)
+*   Extract relevant attributes and properties
+*   Pull in contextual information from community reports or other sources
+
+本地搜索是一种检索和响应生成方法，它通过基于用户问题中提到的特定实体在您的文档集合中找到最相关的信息来工作。其工作原理如下：
+
+1.   实体识别：当用户提出问题时，系统识别与查询在语义上相关的关键实体（人员、地点、概念等）。
+
+2.   知识图谱导航：这些识别出的实体充当进入知识图谱的入口点，使系统能够：
+
+*   找到连接的实体（关系）
+*   提取相关的属性和特性
+*   从社区报告或其他来源拉取上下文信息
+
+After [indexing our entities in Weaviate](https://colab.research.google.com/github/neo4j-contrib/ms-graphrag-neo4j/blob/main/examples/neo4j_weaviate_combined.ipynb#scrollTo=n105cc-_B9bN), we'll implement a retrieval pipeline that leverages both vector and graph databases. First, Weaviate's semantic search capabilities identify the most relevant entities based on the query's meaning. Then, we can use Neo4j's graph traversal capabilities to discover connected entities, relationships, and community structures, revealing both direct connections and broader contextual networks that might not be immediately apparent through vector search alone. This hybrid approach combines the semantic understanding of vector search with the relationship intelligence of graph databases for comprehensive information retrieval.
+
+在[在 Weaviate 中索引我们的实体](https://colab.research.google.com/github/neo4j-contrib/ms-graphrag-neo4j/blob/main/examples/neo4j_weaviate_combined.ipynb#scrollTo=n105cc-_B9bN)之后，我们将实现一个利用向量和图谱数据库的检索流水线。首先，Weaviate 的语义搜索功能根据查询的含义识别最相关的实体。然后，我们可以使用 Neo4j 的图谱遍历功能来发现连接的实体、关系和社区结构，揭示通过向量搜索 alone 可能不会立即显现的直接连接和更广泛的上下文网络。这种混合方法将向量搜索的语义理解与图谱数据库的关系智能结合起来，实现全面的信息检索。
+
+```javascript
+retriever = WeaviateNeo4jRetriever(driver=driver, 
+                                  client=client, 
+                                  collection="Entities", 
+                                  id_property_external="entity_id", 
+                                  id_property_neo4j="name", 
+                                  retrieval_query=retrieval_query)
+```
+
+First, we query the Weaviate vector database to identify relevant entities based on semantic similarity to the user's question. The retrieved entity IDs serve as linking points that we map to corresponding nodes within our Neo4j graph database.
+
+首先，我们查询 Weaviate 向量数据库，基于与用户问题的语义相似性来识别相关实体。检索到的实体 ID 作为链接点，我们将其映射到 Neo4j 图谱数据库中的相应节点。
+
+Behind the scenes, the system then executes a [Cypher query](https://github.com/neo4j-contrib/ms-graphrag-neo4j/blob/main/src/ms_graphrag_neo4j/cypher_queries.py) that traverses the knowledge graph, following relationships between entities and extracting contextually relevant information. The integration of both the semantic search capabilities of Weaviate and the relationship-oriented structure of Neo4j creates a retrieval system that understands both content and connections within your data. The retrieval query is:
+
+```cypher
+retrieval_query = """WITH collect(node) as nodes
+WITH collect {
+    UNWIND nodes as n
+    MATCH (n)<-[:MENTIONS]->(c:__Chunk__)
+    WITH c, count(distinct n) as freq
+    RETURN c.text AS chunkText
+    ORDER BY freq DESC
+    LIMIT 3
+} AS text_mapping,
+collect {
+    UNWIND nodes as n
+    MATCH (n)-[:IN_COMMUNITY*]->(c:__Community__)
+    WHERE c.summary IS NOT NULL
+    WITH c, c.rating as rank
+    RETURN c.summary
+    ORDER BY rank DESC
+    LIMIT 3
+} AS report_mapping,
+collect {
+    UNWIND nodes as n
+    MATCH (n)-[r:SUMMARIZED_RELATIONSHIP]-(m)
+    WHERE m IN nodes
+    RETURN r.summary AS descriptionText
+    LIMIT 3
+} as insideRels,
+collect {
+    UNWIND nodes as n
+    RETURN n.summary AS descriptionText
+} as entities
+RETURN {Chunks: text_mapping, Reports: report_mapping,
+        Relationships: insideRels,
+        Entities: entities} AS output"""
+```
+
+在幕后，系统然后执行一个 [Cypher 查询](https://github.com/neo4j-contrib/ms-graphrag-neo4j/blob/main/src/ms_graphrag_neo4j/cypher_queries.py)，遍历知识图谱，跟随实体之间的关系并提取上下文相关的信息。Weaviate 的语义搜索功能和 Neo4j 的面向关系结构的集成创建了一个既能理解您数据中的内容又能理解连接的检索系统。检索查询是：
+
+```cypher
+retrieval_query = """WITH collect(node) as nodes
+WITH collect {
+    UNWIND nodes as n
+    MATCH (n)<-[:MENTIONS]->(c:__Chunk__)
+    WITH c, count(distinct n) as freq
+    RETURN c.text AS chunkText
+    ORDER BY freq DESC
+    LIMIT 3
+} AS text_mapping,
+collect {
+    UNWIND nodes as n
+    MATCH (n)-[:IN_COMMUNITY*]->(c:__Community__)
+    WHERE c.summary IS NOT NULL
+    WITH c, c.rating as rank
+    RETURN c.summary
+    ORDER BY rank DESC
+    LIMIT 3
+} AS report_mapping,
+collect {
+    UNWIND nodes as n
+    MATCH (n)-[r:SUMMARIZED_RELATIONSHIP]-(m)
+    WHERE m IN nodes
+    RETURN r.summary AS descriptionText
+    LIMIT 3
+} as insideRels,
+collect {
+    UNWIND nodes as n
+    RETURN n.summary AS descriptionText
+} as entities
+RETURN {Chunks: text_mapping, Reports: report_mapping,
+        Relationships: insideRels,
+        Entities: entities} AS output"""
+```
+
+This Cypher query traverses from the initial set of entities to their corresponding neighbors, communities, chunks, and more.
+
+这个 Cypher 查询从初始实体集遍历到其对应的邻居、社区、块等。
+
+If we test on the same example about Weaviate, we get the following answer (Note: all of the data for this demo is generated 👍):
+
+```
+Weaviate is a corporation organized under the laws of both the State of California and the State of Delaware. Its principal place of business is primarily located in San Francisco, CA, with additional offices at 123 Innovation Drive, Tech City, CA, and 123 Tech Lane, Silicon Valley, CA. The company is involved in a wide range of activities, including consulting, software development, data analysis, cloud storage, technical support, and project management services. Weaviate is actively engaged in partnerships to develop innovative AI solutions and advanced data processing technologies, contributing resources and expertise to these collaborations.....
+```
+
+如果我们用同样的 Weaviate 示例进行测试，我们会得到以下答案（注意：此演示的所有数据都是生成的 👍）：
+
+```
+Weaviate 是一家根据加利福尼亚州和特拉华州法律组织的公司。其主要营业地点主要位于加利福尼亚州旧金山，并在加利福尼亚州科技城创新大道 123 号和加利福尼亚州硅谷科技巷 123 号设有额外办事处。该公司从事广泛的活动，包括咨询、软件开发、数据分析、云存储、技术支持和项目管理服务。Weaviate 积极参与合作伙伴关系，以开发创新的 AI 解决方案和先进的数据处理技术，为这些合作贡献资源和专业知识.....
+```
+
+### Known Limitations of GraphRAG / GraphRAG 的已知局限性
+
+MS GraphRAG offers more entity-centric indexing and retrieval compared to traditional RAG's chunk-based approach, providing richer entity and community descriptions. However, it faces challenges with static LLM-generated summaries that require periodic full reindexing to capture updates when new data comes in. This indexing pipeline can incur substantial token costs. In contrast, traditional RAG does not require any reindexing pipeline for summary generation when new data is added, allowing for more efficient updates. Additionally, scalability might become problematic with nodes having thousands of connections, and highly-connected generic entity types must be filtered to prevent skewed results. The comprehensive preprocessing required for summarization represents both a strength for detail and a limitation for maintaining current information.
+
+与传统 RAG 基于块的方法相比，MS GraphRAG 提供了更多以实体为中心的索引和检索，提供更丰富的实体和社区描述。然而，它面临着静态大语言模型生成摘要的挑战，需要定期完全重新索引以捕获新数据进入时的更新。这个索引流水线可能会产生大量的令牌成本。相比之下，传统 RAG 在添加新数据时不需要任何重新索引流水线来生成摘要，从而实现更高效的更新。此外，当节点有数千个连接时，可扩展性可能会出现问题，必须过滤高度连接的通用实体类型以防止结果偏差。摘要所需的全面预处理既代表了细节方面的优势，也代表了维护当前信息方面的局限性。
+
+## Summary / 总结
+
+While Naive RAG is a simple and effective starting point for retrieval-augmented generation—especially when your data is well-structured and self-contained—Graph RAG takes things a step further by understanding the relationships and context between entities. It's particularly powerful when your data is rich in connections and interdependencies, like contracts, research papers, or organizational records. By combining both approaches in a hybrid system, you can leverage the best of semantic similarity and structural insights to deliver more nuanced, accurate, and insightful responses. Whether you're just getting started with RAG or looking to push the boundaries with GraphRAG, choosing the right strategy starts with understanding your data.
+
+虽然简单 RAG 是检索增强生成的简单而有效的起点——特别是当您的数据结构良好且自包含时——Graph RAG 通过理解实体之间的关系和上下文将事情更进一步。当您的数据富含连接和相互依赖关系时，比如合同、研究论文或组织记录，它特别强大。通过在混合系统中结合两种方法，您可以利用语义相似性和结构洞察力的最佳组合，提供更细致、准确和有见地的响应。无论您是刚刚开始使用 RAG 还是希望在 GraphRAG 方面突破界限，选择正确的策略都始于理解您的数据。
+
+## Ready to start building? / 准备开始构建？
+
+Check out the [Quickstart tutorial](https://docs.weaviate.io/weaviate/quickstart), or build amazing apps with a free trial of [Weaviate Cloud (WCD)](https://console.weaviate.cloud/).
+
+查看[快速入门教程](https://docs.weaviate.io/weaviate/quickstart)，或使用 [Weaviate Cloud (WCD)](https://console.weaviate.cloud/) 的免费试用版构建令人惊叹的应用程序。

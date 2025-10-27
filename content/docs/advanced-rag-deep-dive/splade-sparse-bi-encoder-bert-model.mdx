@@ -1,0 +1,112 @@
+---
+title: "SPLADE – a sparse bi-encoder BERT-based model achieves effective and efficient first-stage ranking | SPLADE：一种实现高效第一阶段排序的稀疏双编码器BERT模型"
+description: 了解SPLADE模型如何结合稀疏表示和BERT的语义理解能力来实现高效的信息检索。Understanding how the SPLADE model combines sparse representations with BERT's semantic understanding for efficient information retrieval.
+---
+
+# SPLADE – a sparse bi-encoder BERT-based model achieves effective and efficient first-stage ranking | SPLADE：一种实现高效第一阶段排序的稀疏双编码器BERT模型
+
+When you type a query into a search engine, millions of operations occur faster than the blink of an eye. Most search engine architectures use machine-learning-based ranking algorithms. Ranking algorithms have many different components, but the standard pipeline can be seen as a two-stage process involving two models: the ranker (which selects a candidate set of documents) and the reranker (which finds the optimal document order).
+
+当你在搜索引擎中输入查询时，数百万次操作会在眨眼间发生。大多数搜索引擎架构使用基于机器学习的排名算法。排名算法有许多不同的组件，但标准流程可以看作是涉及两个模型的两阶段过程：排名器（选择候选文档集）和重排器（找到最佳文档顺序）。
+
+## The stages of search: ranking and reranking | 搜索阶段：排名和重排
+
+An efficient first ranker preselects a candidate set of documents from the billions that exist on the web by means of a term-based model—like BM25—and an inverted index. For a textbook, an inverted index is simply a list that indicates the occurrence of keywords within the text. For web pages, the concept is similar, but for each word in the 'vocabulary', a list of documents (or pages) containing that word is stored. This index allows quick access to the documents that contain the query terms, and drastically reduces the cost of retrieval, as we can safely ignore any documents that do not overlap the query. Thus, the basic technology behind a search engine requires detecting and counting words. This results in very high-dimensional sparse vectors (i.e. that have mostly zero values) by nature, as the vocabulary is generally large and documents only contain a small subset of terms.
+
+一个高效的初级排名器通过基于术语的模型（如BM25）和倒排索引来从网络上存在的数十亿文档中预选候选文档集。对于教科书来说，倒排索引就是一个简单的列表，指示文本中关键词的出现情况。对于网页，概念类似，但对于"词汇表"中的每个词，都会存储包含该词的文档（或页面）列表。这个索引允许快速访问包含查询词的文档，并大大降低了检索成本，因为我们可以安全地忽略任何与查询不重叠的文档。因此，搜索引擎背后的基本技术需要检测和计算词汇。这自然会产生非常高维的稀疏向量（即大部分值为零），因为词汇表通常很大，而文档只包含一小部分词汇。
+
+The second model, called a reranker, is then applied to find the optimal document order for your query from the candidate set. The reranker, which generally involves more computations than the first ranker, is based on classical machine learning models (e.g. gradient boosted trees or neural networks).
+
+第二个模型称为重排器，用于从候选集中为你的查询找到最佳文档顺序。重排器通常比初级排名器涉及更多的计算，它基于经典的机器学习模型（如梯度提升树或神经网络）。
+
+## Using BERT to understand natural language for information retrieval | 使用BERT理解自然语言进行信息检索
+
+If you follow technology trends in artificial intelligence, you've likely encountered the deep-neural-network technology BERT ([1](https://aclanthology.org/N19-1423.pdf))—one of many such models named after muppets—and follow-ups like RoBERTa, ELECTRA and BART. BERT is based on the transformer architecture that models natural language, words, and sentences, and embeds words (and possibly sentences) into a few hundred-dimensional continuous vectors to learn how they are implicitly composed. By doing computations on the vectors, BERT can tackle many natural language processing tasks, including ad hoc information retrieval (IR). Since the beginning of 2019, BERT-based ranking models have been state of the art by a large margin.
+
+如果你关注人工智能的技术趋势，你可能已经遇到过深度神经网络技术BERT（[1](https://aclanthology.org/N19-1423.pdf)）——这是许多以木偶命名的模型之一——以及后续的RoBERTa、ELECTRA和BART。BERT基于建模自然语言、词汇和句子的变压器架构，将词汇（可能还有句子）嵌入到几百维的连续向量中，以学习它们是如何隐式组成的。通过对向量进行计算，BERT可以处理许多自然语言处理任务，包括临时信息检索（IR）。自2019年初以来，基于BERT的排名模型在很大程度上处于领先地位。
+
+In contrast with the term-based sparse vectors that are traditionally used in IR, like tf-IDF (term frequency–inverse document frequency), BERT-like models represent words as continuous or dense vectors, called embeddings, which are latent (i.e. we cannot directly interpret their dimensions). Modeling text with continuous vectors is not novel per se: in the 1990s, latent semantic indexing (LSI) was the first approach to continuous embedding. What is novel and impressive about BERT, however, is the breakthrough performance it provides compared to existing methods.
+
+与IR中传统使用的基于术语的稀疏向量（如tf-IDF，词频-逆文档频率）相比，BERT类模型将词汇表示为连续或密集的向量，称为嵌入，这些向量是潜在的（即我们无法直接解释其维度）。用连续向量建模文本本身并不新颖：在1990年代，潜在语义索引（LSI）是连续嵌入的第一种方法。然而，BERT的新颖和令人印象深刻之处在于它相比现有方法提供的突破性性能。
+
+BERT was initially used as a reranker for IR. Later, though, BERT became the backbone of efficient architectures that tackle first-stage ranking, even competing with standard models (like BM25) that have rarely been challenged over the years.
+
+BERT最初被用作IR的重排器。但后来，BERT成为解决第一阶段排名的高效架构的支柱，甚至与多年来很少受到挑战的标准模型（如BM25）竞争。
+
+In first-stage ranking, we need to create an index of the representations created by BERT. To do so, we use 'approximate nearest neighbouring' (ANN) techniques ([2](https://ieeexplore.ieee.org/document/8733051)). Imagine that you're a sailor in the night looking up into a star-studded sky. To find your route, you must first create a map of these stars so that you're then able to triangulate your position. This is similar to creating an index for BERT continuous vectors. The index is essentially creating appropriate, efficient data structures to search over billions of data points. Fortunately, ANNs—which were originally developed for computer vision—can be directly applied to our scenario.
+
+在第一阶段排名中，我们需要创建BERT生成的表示的索引。为此，我们使用"近似最近邻"（ANN）技术（[2](https://ieeexplore.ieee.org/document/8733051)）。想象你是一个夜晚仰望繁星满天的水手。要找到你的路线，你必须首先创建这些星星的地图，然后才能三角定位你的位置。这类似于为BERT连续向量创建索引。索引本质上是创建适当、高效的数据结构来搜索数十亿个数据点。幸运的是，最初为计算机视觉开发的ANN可以直接应用到我们的情景中。
+
+## Approaches to indexing: dense versus sparse | 索引方法：密集与稀疏
+
+It is legitimate to wonder whether the traditional way of storing text (i.e. with keyword-based representations, such as inverted indexes) is now obsolete. In practice, current systems use a combination of sparse and continuous vectors to perform search, and there is not yet a clear and definitive answer regarding which is more efficient. Indeed, in recent years an unsettled debate has bubbled away over which—between the sparse (lexical) and dense (semantic) representation—approach to information retrieval is better. They have their own individual advantages and weaknesses and may simply complement each other when used together.
+
+我们有理由怀疑存储文本的传统方式（即基于关键词的表示，如倒排索引）现在是否已经过时。在实践中，当前系统使用稀疏向量和连续向量的组合来执行搜索，而对于哪种方法更高效，还没有明确和确定的答案。事实上，近年来关于稀疏（词汇）和密集（语义）表示哪种信息检索方法更好的争论一直在持续。它们各有优缺点，当一起使用时可能只是相互补充。
+
+However, there are at least two benefits of sparse representations over dense ones. First, sparse representations make it much easier to interpret how documents are ranked for a given query. Each dimension in the representation corresponds to an actual word (or subword), and sparsity makes it easy to isolate which words contribute to the score. In contrast, interpreting the continuous representations from BERT is much harder. Like most machine-learning models, it acts like a black box and, as such, its output requires more thorough analysis. The second advantage of sparse representations is that integrating new sparse pretrained language models into the search engine infrastructure has no huge additional cost. Although the migration of new models can be limiting in terms of model design, it can be achieved seamlessly.
+
+然而，稀疏表示相比密集表示至少有两个优势。首先，稀疏表示使解释文档如何针对给定查询进行排名变得更加容易。表示中的每个维度对应一个实际的词（或子词），而稀疏性使得容易隔离哪些词对得分有贡献。相比之下，解释BERT的连续表示要困难得多。像大多数机器学习模型一样，它像一个黑盒子，因此其输出需要更彻底的分析。稀疏表示的第二个优势是，将新的稀疏预训练语言模型集成到搜索引擎基础设施中没有巨大的额外成本。尽管新模型的迁移在模型设计方面可能有限制，但可以无缝实现。
+
+## Introducing SPLADE | 介绍SPLADE
+
+[SPLADE: Sparse Lexical and Expansion Model for First Stage Ranking.](https://europe.naverlabs.com/research/publications/splade-sparse-lexical-and-expansion-model-for-first-stage-ranking/) Thibault Formal, Benjamin Piwowarski, Stephane Clinchant. 44th International ACM SIGIR Conference on Research and Development in Information Retrieval (SIGIR), virtual event, July 11-15, 2021.
+
+[SPLADE：用于第一阶段排名的稀疏词汇和扩展模型。](https://europe.naverlabs.com/research/publications/splade-sparse-lexical-and-expansion-model-for-first-stage-ranking/) Thibault Formal, Benjamin Piwowarski, Stephane Clinchant。第44届国际ACM SIGIR信息检索研究与开发会议（SIGIR），虚拟活动，2021年7月11-15日。
+
+SPLADE stands for **SP**arse **L**exical **A**nd expansion **D**ocument **E**xpansion. It is a sparse bi-encoder model based on BERT that aims to combine the benefits of both sparse and dense representations for first-stage ranking.
+
+SPLADE代表**S**parse **P**arse **L**exical **A**nd expansion **D**ocument **E**xpansion（稀疏词汇和扩展文档扩展）。它是一个基于BERT的稀疏双编码器模型，旨在结合稀疏和密集表示在第一阶段排名中的优势。
+
+The key innovation of SPLADE is that it uses BERT to generate sparse representations of documents and queries, rather than dense ones. This is achieved by applying a ReLU activation function to the output of BERT and then using the resulting activations as weights for the vocabulary terms. This approach allows SPLADE to benefit from BERT's semantic understanding while maintaining the interpretability and efficiency of sparse representations.
+
+SPLADE的关键创新在于它使用BERT生成文档和查询的稀疏表示，而不是密集表示。这是通过在BERT的输出上应用ReLU激活函数，然后将生成的激活用作词汇术语的权重来实现的。这种方法使SPLADE能够从BERT的语义理解中受益，同时保持稀疏表示的可解释性和效率。
+
+## How SPLADE Works | SPLADE的工作原理
+
+SPLADE uses a bi-encoder architecture, where both the query and document are encoded separately using BERT-based models. The key difference from dense retrieval models is in how the representations are generated:
+
+SPLADE使用双编码器架构，其中查询和文档都使用基于BERT的模型分别编码。与密集检索模型的关键区别在于表示的生成方式：
+
+1. **Sparse Representation Generation**: Instead of using the raw BERT embeddings, SPLADE applies a ReLU activation function to the BERT output and uses the resulting values as weights for the vocabulary terms. This creates sparse vectors where most dimensions are zero, and only the most relevant terms have non-zero weights.
+
+   **稀疏表示生成**：SPLADE不使用原始BERT嵌入，而是在BERT输出上应用ReLU激活函数，并将生成的值用作词汇术语的权重。这创建了稀疏向量，其中大多数维度为零，只有最相关的术语具有非零权重。
+
+2. **Lexical Expansion**: SPLADE also incorporates lexical expansion, where related terms are added to the representation to improve recall. This is done by identifying semantically similar terms and including them in the sparse representation.
+
+   **词汇扩展**：SPLADE还包含词汇扩展，其中相关术语被添加到表示中以提高召回率。这是通过识别语义相似的术语并将它们包含在稀疏表示中来完成的。
+
+3. **Efficient Indexing**: The sparse representations can be efficiently indexed using traditional inverted indexes, making first-stage retrieval fast and scalable.
+
+   **高效索引**：稀疏表示可以使用传统的倒排索引高效索引，使第一阶段检索快速且可扩展。
+
+## Benefits of SPLADE | SPLADE的优势
+
+SPLADE offers several advantages over both traditional sparse and dense retrieval models:
+
+SPLADE相比传统的稀疏和密集检索模型具有几个优势：
+
+1. **Semantic Understanding**: By leveraging BERT, SPLADE can capture semantic relationships between terms, leading to better retrieval performance than purely lexical models.
+
+   **语义理解**：通过利用BERT，SPLADE可以捕捉术语之间的语义关系，从而比纯词汇模型有更好的检索性能。
+
+2. **Interpretability**: The sparse representations make it easy to understand why a document was retrieved for a given query, as each non-zero dimension corresponds to an actual term.
+
+   **可解释性**：稀疏表示使得容易理解为什么为给定查询检索到某个文档，因为每个非零维度对应一个实际术语。
+
+3. **Efficiency**: The sparse representations can be efficiently indexed and searched using existing search engine infrastructure, without requiring specialized ANN techniques.
+
+   **效率**：稀疏表示可以使用现有的搜索引擎基础设施高效索引和搜索，而无需专门的ANN技术。
+
+4. **Integration**: SPLADE can be easily integrated into existing search pipelines, as it produces representations that are compatible with traditional ranking algorithms.
+
+   **集成**：SPLADE可以轻松集成到现有的搜索流程中，因为它产生的表示与传统排名算法兼容。
+
+## Conclusion | 结论
+
+SPLADE represents an important advancement in information retrieval by successfully combining the semantic understanding capabilities of BERT with the efficiency and interpretability of sparse representations. This approach addresses some of the key challenges in modern search systems, where there is often a trade-off between effectiveness and efficiency.
+
+SPLADE通过成功结合BERT的语义理解能力和稀疏表示的效率和可解释性，代表了信息检索的重要进展。这种方法解决了现代搜索系统中的一些关键挑战，在这些系统中有效性与效率之间往往存在权衡。
+
+As search systems continue to evolve, models like SPLADE that bridge the gap between lexical and semantic approaches will likely play an increasingly important role in providing both effective and efficient retrieval capabilities.
+
+随着搜索系统的不断发展，像SPLADE这样弥合词汇和语义方法之间差距的模型将在提供有效和高效的检索能力方面发挥越来越重要的作用。

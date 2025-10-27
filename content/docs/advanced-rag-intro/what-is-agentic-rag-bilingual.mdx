@@ -1,0 +1,366 @@
+---
+title: What is Agentic RAG (英中对照版)
+description: Learn about Agentic RAG, which incorporates AI agents into the RAG pipeline to orchestrate components and perform actions beyond simple information retrieval. 了解智能体 RAG (Agentic RAG)，它将 AI 智能体集成到 RAG 流水线中以协调组件并执行简单的信息检索之外的操作。
+---
+
+# What is Agentic RAG / 什么是智能体 RAG (Agentic RAG)
+
+While Retrieval-Augmented Generation (RAG) dominated 2023, [agentic workflows are driving massive progress in 2024](https://x.com/AndrewYNg/status/1770897666702233815?lang=en). The usage of AI agents opens up new possibilities for building more powerful, robust, and versatile Large Language Model(LLM)-powered applications. One possibility is enhancing RAG pipelines with AI agents in agentic RAG pipelines.
+
+在 2023 年检索增强生成 (RAG) 占据主导地位的同时，[智能体工作流正在推动 2024 年的巨大进步](https://x.com/AndrewYNg/status/1770897666702233815?lang=en)。AI 智能体的使用为构建更强大、更稳健和更多功能的大语言模型 (LLM) 驱动的应用程序开辟了新的可能性。其中一种可能性是在智能体 RAG 流水线中使用 AI 智能体来增强 RAG 流水线。
+
+This article introduces you to the concept of agentic RAG, its implementation, and its benefits and limitations.
+
+本文将向您介绍智能体 RAG 的概念、实现方式以及其优势和局限性。
+
+## Fundamentals of Agentic RAG / 智能体 RAG 的基础
+
+Agentic RAG describes an AI agent-based implementation of RAG. Before we go any further, let's quickly recap the fundamental concepts of RAG and AI agents.
+
+智能体 RAG 描述了一种基于 AI 智能体的 RAG 实现。在我们进一步探讨之前，让我们快速回顾一下 RAG 和 AI 智能体的基本概念。
+
+### What is Retrieval-Augmented Generation (RAG) / 什么是检索增强生成 (RAG)
+
+[Retrieval-Augmented Generation (RAG)](https://weaviate.io/blog/introduction-to-rag) is a technique for building LLM-powered applications. It leverages an external knowledge source to provide the LLM with relevant context and reduce hallucinations.
+
+[检索增强生成 (RAG)](https://weaviate.io/blog/introduction-to-rag) 是一种构建 LLM 驱动应用程序的技术。它利用外部知识源为 LLM 提供相关上下文并减少幻觉。
+
+A naive RAG pipeline consists of a retrieval component (typically composed of an embedding model and a vector database) and a generative component (an LLM). At inference time, the user query is used to run a similarity search over the indexed documents to retrieve the most similar documents to the query and provide the LLM with additional context.
+
+一个简单的 RAG 流水线由检索组件（通常由嵌入模型和向量数据库组成）和生成组件（一个 LLM）组成。在推理时，用户查询用于在索引文档上运行相似性搜索，以检索与查询最相似的文档，并为 LLM 提供额外的上下文。
+
+Typical RAG applications have two considerable limitations:
+
+典型的 RAG 应用程序有两个重要限制：
+
+1. The naive RAG pipeline only considers one external knowledge source. However, some solutions might require two external knowledge sources, and some solutions might require external tools and APIs, such as web searches.
+2. They are a one-shot solution, which means that context is retrieved once. There is no reasoning or validation over the quality of the retrieved context.
+
+1. 简单的 RAG 流水线只考虑一个外部知识源。然而，某些解决方案可能需要两个外部知识源，某些解决方案可能需要外部工具和 API，如网络搜索。
+2. 它们是一次性解决方案，这意味着上下文只检索一次。对检索到的上下文质量没有推理或验证。
+
+### What are Agents in AI Systems / AI 系统中的智能体是什么
+
+With the popularity of LLMs, new paradigms of AI agents and multi-agent systems have emerged. AI agents are LLMs with a role and task that have access to memory and external tools. The reasoning capabilities of LLMs help the agent plan the required steps and take action to complete the task at hand.
+
+随着 LLM 的普及，AI 智能体和多智能体系统的新范式已经出现。AI 智能体是具有角色和任务的 LLM，可以访问内存和外部工具。LLM 的推理能力帮助智能体规划所需的步骤并采取行动来完成手头的任务。
+
+Thus, the core components of an AI agent are:
+
+因此，AI 智能体的核心组件是：
+
+* LLM (with a role and a task) / LLM（具有角色和任务）
+* Memory (short-term and long-term) / 内存（短期和长期）
+* Planning (e.g., reflection, self-critics, query routing, etc.) / 规划（例如，反思、自我批评、查询路由等）
+* Tools (e.g., calculator, web search, etc.) / 工具（例如，计算器、网络搜索等）
+
+One popular framework is the [ReAct framework](https://arxiv.org/abs/2210.03629). A ReAct agent can handle sequential multi-part queries while maintaining state (in memory) by combining routing, query planning, and tool use into a single entity.
+
+一个流行的框架是 [ReAct 框架](https://arxiv.org/abs/2210.03629)。ReAct 智能体可以通过将路由、查询规划和工具使用结合到单个实体中，在保持状态（在内存中）的同时处理顺序的多部分查询。
+
+> ReAct = Reason + Act (with LLMs)
+
+> ReAct = 推理 + 行动（使用 LLM）
+
+The process involves the following steps:
+
+该过程包括以下步骤：
+
+1. Thought: Upon receiving the user query, the agent reasons about the next action to take
+2. Action: the agent decides on an action and executes it (e.g., tool use)
+3. Observation: the agent observes the feedback from the action
+4. This process iterates until the agent completes the task and responds to the user.
+
+1. 思考：在接收到用户查询后，智能体推理下一步要采取的行动
+2. 行动：智能体决定一个行动并执行它（例如，使用工具）
+3. 观察：智能体观察行动的反馈
+4. 这个过程重复进行，直到智能体完成任务并向用户响应。
+
+## What is Agentic RAG? / 什么是智能体 RAG？
+
+Agentic RAG describes an AI agent-based implementation of RAG. Specifically, it incorporates AI agents into the RAG pipeline to orchestrate its components and perform additional actions beyond simple information retrieval and generation to overcome the limitations of the non-agentic pipeline.
+
+智能体 RAG 描述了一种基于 AI 智能体的 RAG 实现。具体来说，它将 AI 智能体集成到 RAG 流水线中，以协调其组件并执行简单的信息检索和生成之外的额外行动，以克服非智能体流水线的局限性。
+
+> Agentic RAG describes an AI agent-based implementation of RAG.
+
+> 智能体 RAG 描述了一种基于 AI 智能体的 RAG 实现。
+
+### How does Agentic RAG work? / 智能体 RAG 是如何工作的？
+
+Although agents can be incorporated in different stages of the RAG pipeline, agentic RAG most commonly refers to the use of agents in the retrieval component.
+
+尽管智能体可以集成到 RAG 流水线的不同阶段，但智能体 RAG 最常指的是在检索组件中使用智能体。
+
+Specifically, the retrieval component becomes agentic through the use of retrieval agents with access to different retriever tools, such as:
+
+具体来说，检索组件通过使用具有访问不同检索工具权限的检索智能体而变得具有智能体特性，例如：
+
+* Vector search engine (also called a query engine) that performs vector search over a vector index (like in typical RAG pipelines)
+* Web search
+* Calculator
+* Any API to access software programmatically, such as email or chat programs
+* and many more.
+
+* 向量搜索引擎（也称为查询引擎），在向量索引上执行向量搜索（如在典型的 RAG 流水线中）
+* 网络搜索
+* 计算器
+* 任何以编程方式访问软件的 API，如电子邮件或聊天程序
+* 以及更多。
+
+The RAG agent can then reason and act over the following example retrieval scenarios:
+
+然后，RAG 智能体可以对以下示例检索场景进行推理和行动：
+
+1. Decide whether to retrieve information or not
+2. Decide which tool to use to retrieve relevant information
+3. Formulate the query itself 
+4. Evaluate the retrieved context and decide whether it needs to re-retrieve.
+
+1. 决定是否检索信息
+2. 决定使用哪个工具来检索相关信息
+3. 自己制定查询
+4. 评估检索到的上下文并决定是否需要重新检索。
+
+### Agentic RAG Architecture / 智能体 RAG 架构
+
+In contrast to the sequential naive RAG architecture, the core of the agentic RAG architecture is the agent. Agentic RAG architectures can have various levels of complexity. In the simplest form, a single-agent RAG architecture is a simple router. However, you can also add multiple agents into a multi-agent RAG architecture. This section discusses the two fundamental RAG architectures.
+
+与顺序的简单 RAG 架构相比，智能体 RAG 架构的核心是智能体。智能体 RAG 架构可以具有不同程度的复杂性。在最简单的形式中，单智能体 RAG 架构是一个简单的路由器。但是，您也可以将多个智能体添加到多智能体 RAG 架构中。本节讨论两种基本的 RAG 架构。
+
+**Single-Agent RAG (Router)** / **单智能体 RAG（路由器）**
+
+In its simplest form, agentic RAG is a router. This means you have at least two external knowledge sources, and the agent decides which one to retrieve additional context from. However, the external knowledge sources don't have to be limited to (vector) databases. You can retrieve further information from tools as well. For example, you can conduct a web search, or you could use an API to retrieve additional information from Slack channels or your email accounts.
+
+在最简单的形式中，智能体 RAG 是一个路由器。这意味着您至少有两个外部知识源，智能体决定从哪个知识源检索额外的上下文。然而，外部知识源不必仅限于（向量）数据库。您也可以从工具中检索更多信息。例如，您可以进行网络搜索，或者您可以使用 API 从 Slack 频道或您的电子邮件账户中检索额外信息。
+
+**Multi-agent RAG Systems** / **多智能体 RAG 系统**
+
+As you can guess, the single-agent system also has its limitations because it's limited to only one agent with reasoning, retrieval, and answer generation in one. Therefore, it is beneficial to chain multiple agents into a multi-agent RAG application.
+
+正如您所猜测的，单智能体系统也有其局限性，因为它仅限于一个具有推理、检索和答案生成功能的智能体。因此，将多个智能体链接到多智能体 RAG 应用程序中是有益的。
+
+For example, you can have one master agent who coordinates information retrieval among multiple specialized retrieval agents. For instance, one agent could retrieve information from proprietary internal data sources. Another agent could specialize in retrieving information from your personal accounts, such as email or chat. Another agent could also specialize in retrieving public information from web searches.
+
+例如，您可以有一个主智能体，它协调多个专门的检索智能体之间的信息检索。例如，一个智能体可以从专有的内部数据源检索信息。另一个智能体可以专门从您的个人账户（如电子邮件或聊天）检索信息。另一个智能体也可以专门从网络搜索中检索公共信息。
+
+### Beyond Retrieval Agents / 超越检索智能体
+
+The above example shows the usage of different retrieval agents. However, you could also use agents for purposes other than retrieval. The possibilities of agents in the RAG system are manifold.
+
+上述示例展示了不同检索智能体的使用。然而，您也可以将智能体用于检索以外的目的。智能体在 RAG 系统中的可能性是多样的。
+
+## Agentic RAG vs. (Vanilla) RAG / 智能体 RAG 与（普通）RAG
+
+While the fundamental concept of RAG (sending a query, retrieving information, and generating a response) remains the same, **tool use generalizes it,** making it more flexible and powerful.
+
+虽然 RAG 的基本概念（发送查询、检索信息和生成响应）保持不变，但**工具使用使其通用化**，使其更加灵活和强大。
+
+Think of it this way: Common (vanilla) RAG is like being at the library (before smartphones existed) to answer a specific question. Agentic RAG, on the other hand, is like having a smartphone in your hand with a web browser, a calculator, your emails, etc.
+
+可以这样理解：普通的 RAG 就像在图书馆（智能手机出现之前）回答特定问题。而智能体 RAG 就像手中拿着智能手机，有网络浏览器、计算器、您的电子邮件等。
+
+|  | Vanilla RAG | Agentic RAG |
+| --- | --- | --- |
+| Access to external tools | No | Yes |
+| Query pre-processing | No | Yes |
+| Multi-step retrieval | No | Yes |
+| Validation of retrieved information | No | Yes |
+
+|  | 普通 RAG | 智能体 RAG |
+| --- | --- | --- |
+| 访问外部工具 | 否 | 是 |
+| 查询预处理 | 否 | 是 |
+| 多步检索 | 否 | 是 |
+| 检索信息验证 | 否 | 是 |
+
+## Implementing Agentic RAG / 实现智能体 RAG
+
+As outlined earlier, agents are comprised of multiple components. To build an agentic RAG pipeline, there are two options: a language model with function calling or an agent framework. Both implementations get to the same result, it will just depend on the control and flexibility you want.
+
+如前所述，智能体由多个组件组成。要构建智能体 RAG 流水线，有两种选择：具有函数调用功能的语言模型或智能体框架。这两种实现都能达到相同的结果，这只是取决于您想要的控制和灵活性。
+
+### Language Models with Function Calling / 具有函数调用功能的语言模型
+
+Language models are the main component of agentic RAG systems. The other component is tools, which enable the language model access to external services. Language models with function calling offer a way to build an agentic system by allowing the model to interact with predefined tools. Language model providers have added this feature to their clients.
+
+语言模型是智能体 RAG 系统的主要组件。另一个组件是工具，它使语言模型能够访问外部服务。具有函数调用功能的语言模型通过允许模型与预定义工具交互来提供构建智能体系统的方法。语言模型提供商已将此功能添加到他们的客户端中。
+
+In June 2023, [OpenAI released function calling](https://platform.openai.com/docs/assistants/tools/function-calling) for `gpt-3.5-turbo` and `gpt-4`. It enabled these models to reliably connect GPT's capabilities with external tools and APIs. Developers quickly started building applications that plugged `gpt-4` into code executors, databases, calculators, and more.
+
+2023 年 6 月，[OpenAI 为 `gpt-3.5-turbo` 和 `gpt-4` 发布了函数调用功能](https://platform.openai.com/docs/assistants/tools/function-calling)。这使得这些模型能够可靠地将 GPT 的功能与外部工具和 API 连接起来。开发人员迅速开始构建将 `gpt-4` 插入代码执行器、数据库、计算器等的应用程序。
+
+[Cohere](https://docs.cohere.com/v2/docs/tool-use) further launched their connectors API to add tools to the Command-R suite of models. Additionally, [Anthropic](https://docs.anthropic.com/en/docs/build-with-claude/tool-use) and [Google](https://ai.google.dev/gemini-api/docs/function-calling) launched function calling for Claude and Gemini. By powering these models with external services, it can access and cite web resources, execute code and more.
+
+[Cohere](https://docs.cohere.com/v2/docs/tool-use) 进一步推出了他们的连接器 API，以将工具添加到 Command-R 模型套件中。此外，[Anthropic](https://docs.anthropic.com/en/docs/build-with-claude/tool-use) 和 [Google](https://ai.google.dev/gemini-api/docs/function-calling) 为 Claude 和 Gemini 推出了函数调用功能。通过使用外部服务驱动这些模型，它可以访问和引用网络资源，执行代码等。
+
+Function calling isn't only for proprietary models. Ollama introduced tool support for popular open-source models like `Llama3.2`, `nemotron-mini`, and [others](https://ollama.com/search?c=tools).
+
+函数调用不仅适用于专有模型。Ollama 为流行的开源模型如 `Llama3.2`、`nemotron-mini` 和[其他模型](https://ollama.com/search?c=tools)引入了工具支持。
+
+To build a tool, you first need to define the function. In this snippet, we're writing a function that is using Weaviate's [hybrid search](https://docs.weaviate.io/weaviate/search/hybrid) to retrieve objects from the database:
+
+要构建一个工具，您首先需要定义函数。在此代码片段中，我们正在编写一个使用 Weaviate 的[混合搜索](https://docs.weaviate.io/weaviate/search/hybrid)从数据库中检索对象的函数：
+
+```python
+def get_search_results(query: str) -> str:
+    """Sends a query to Weaviate's Hybrid Search. Parses the response into a {k}:{v} string."""
+    
+    response = blogs.query.hybrid(query, limit=5)
+    
+    stringified_response = ""
+    for idx, o in enumerate(response.objects):
+        stringified_response += f"Search Result: {idx+1}:\n"
+        for prop in o.properties:
+            stringified_response += f"{prop}:{o.properties[prop]}"
+        stringified_response += "\n"
+    
+    return stringified_response
+```
+
+We will then pass the function to the language model via a `tools_schema`. The schema is then used in the prompt to the language model:
+
+然后，我们将通过 `tools_schema` 将函数传递给语言模型。该模式随后在给语言模型的提示中使用：
+
+```python
+tools_schema=[{
+    'type': 'function',
+    'function': {
+        'name': 'get_search_results',
+        'description': 'Get search results for a provided query.',
+        'parameters': {
+          'type': 'object',
+          'properties': {
+            'query': {
+              'type': 'string',
+              'description': 'The search query.',
+            },
+          },
+          'required': ['query'],
+        },
+    },
+}]
+```
+
+Since you're connecting to the language model API directly, you'll need to write a loop that routes between the language model and tools:
+
+由于您直接连接到语言模型 API，您需要编写一个在语言模型和工具之间路由的循环：
+
+```python
+def ollama_generation_with_tools(user_message: str,
+                                tools_schema: List, tool_mapping: Dict,
+                                model_name: str = "llama3.1") -> str:
+    messages=[{
+        "role": "user",
+        "content": user_message
+    }]
+    response = ollama.chat(
+        model=model_name,
+        messages=messages,
+        tools=tools_schema
+    )
+    if not response["message"].get("tool_calls"):
+        return response["message"]["content"]
+    else:
+        for tool in response["message"]["tool_calls"]:
+            function_to_call = tool_mapping[tool["function"]["name"]]
+            print(f"Calling function {function_to_call}...")
+            function_response = function_to_call(tool["function"]["arguments"]["query"])
+            messages.append({
+                "role": "tool",
+                "content": function_response,
+            })
+        final_response = ollama.chat(model=model_name, messages=messages)
+    return final_response["message"]["content"]
+```
+
+Your query will then look like this:
+
+您的查询将如下所示：
+
+```python
+ollama_generation_with_tools("How is HNSW different from DiskANN?",
+                           tools_schema=tools_schema, tool_mapping=tool_mapping)
+```
+
+You can follow along [this recipe](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/function-calling/ollama/ollama-weaviate-agents.ipynb) to recreate the above.
+
+您可以按照[这个配方](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/function-calling/ollama/ollama-weaviate-agents.ipynb)来重现上述内容。
+
+### Agent Frameworks / 智能体框架
+
+Agent Frameworks such as DSPy, LangChain, CrewAI, LlamaIndex, and Letta have emerged to facilitate building applications with language models. These frameworks simplify building agentic RAG systems by plugging pre-built templates together.
+
+DSPy、LangChain、CrewAI、LlamaIndex 和 Letta 等智能体框架已经出现，以促进使用语言模型构建应用程序。这些框架通过将预构建模板组合在一起来简化智能体 RAG 系统的构建。
+
+* DSPy supports [ReAct](https://dspy-docs.vercel.app/deep-dive/modules/react/) agents and [Avatar](https://github.com/stanfordnlp/dspy/blob/main/examples/agents/avatar_langchain_tools.ipynb) optimization. Avatar optimization describes the use of automated prompt engineering for the descriptions of each tool.
+* [LangChain](https://www.langchain.com/) provides many services for working with tools. LangChain's [LCEL](https://python.langchain.com/v0.1/docs/expression_language/) and [LangGraph](https://www.langchain.com/langgraph) frameworks further offer built-in tools.
+* [LlamaIndex](https://www.llamaindex.ai/) further introduces the QueryEngineTool, a collection of templates for retrieval tools.
+* [CrewAI](https://www.crewai.com/) is one of the leading frameworks for developing multi-agent systems. One of the key concepts utilized for tool use is sharing tools amongst agents.
+* [Swarm](https://github.com/openai/swarm) is a framework built by OpenAI for multi-agent orchestration. Swarm similarly focuses on how tools are shared amongst agents.
+* [Letta](https://docs.letta.com/introduction) interfaces reflecting and refining an internal world model as functions. This entails potentially using search results to update the agent's memory of the chatbot user, in addition to responding to the question.
+
+* DSPy 支持 [ReAct](https://dspy-docs.vercel.app/deep-dive/modules/react/) 智能体和 [Avatar](https://github.com/stanfordnlp/dspy/blob/main/examples/agents/avatar_langchain_tools.ipynb) 优化。Avatar 优化描述了使用自动提示工程来描述每个工具。
+* [LangChain](https://www.langchain.com/) 提供了许多用于处理工具的服务。LangChain 的 [LCEL](https://python.langchain.com/v0.1/docs/expression_language/) 和 [LangGraph](https://www.langchain.com/langgraph) 框架进一步提供了内置工具。
+* [LlamaIndex](https://www.llamaindex.ai/) 进一步引入了 QueryEngineTool，这是一个检索工具的模板集合。
+* [CrewAI](https://www.crewai.com/) 是开发多智能体系统的主要框架之一。用于工具使用的关键概念之一是在智能体之间共享工具。
+* [Swarm](https://github.com/openai/swarm) 是 OpenAI 构建的用于多智能体编排的框架。Swarm 同样关注工具如何在智能体之间共享。
+* [Letta](https://docs.letta.com/introduction) 将反映和优化内部世界模型作为函数接口。这包括除了回答问题之外，还可能使用搜索结果来更新智能体对聊天机器人用户的记忆。
+
+## Why are Enterprises Adopting Agentic RAG / 为什么企业采用智能体 RAG
+
+Enterprises are moving on from vanilla RAG to building agentic RAG applications. [Replit released an agent](https://docs.replit.com/replitai/agent) that helps developers build and debug software. Additionally, [Microsoft announced copilots](https://blogs.microsoft.com/blog/2024/10/21/new-autonomous-agents-scale-your-team-like-never-before/) that work alongside users to provide suggestions in completing tasks. These are only a few examples of agents in production and the possibilities are endless.
+
+企业正在从普通 RAG 转向构建智能体 RAG 应用程序。[Replit 发布了一个智能体](https://docs.replit.com/replitai/agent)来帮助开发人员构建和调试软件。此外，[微软宣布了协同机器人](https://blogs.microsoft.com/blog/2024/10/21/new-autonomous-agents-scale-your-team-like-never-before/)，它们与用户一起工作，为完成任务提供建议。这些只是生产中智能体的几个例子，可能性是无限的。
+
+### Benefits of Agentic RAG / 智能体 RAG 的优势
+
+The shift from vanilla RAG to agentic RAG allows these systems to produce more accurate responses, perform tasks autonomously, and better collaborate with humans.
+
+从普通 RAG 转向智能体 RAG 使这些系统能够产生更准确的响应，自主执行任务，并更好地与人类协作。
+
+The benefit of agentic RAG lies primarily in the improved quality of retrieved additional information. By adding agents with access to tool use, the retrieval agent can route queries to specialized knowledge sources. Furthermore, the reasoning capabilities of the agent enable a layer of validation of the retrieved context before it is used for further processing. As a result, agentic RAG pipelines can lead to more robust and accurate responses.
+
+智能体 RAG 的优势主要在于检索到的额外信息质量的提高。通过添加具有工具使用权限的智能体，检索智能体可以将查询路由到专门的知识源。此外，智能体的推理能力能够在检索到的上下文用于进一步处理之前对其进行验证。因此，智能体 RAG 流水线可以产生更稳健和准确的响应。
+
+### Limitations of Agentic RAG / 智能体 RAG 的局限性
+
+However, there are always two sides to every coin. Using an AI agent a for subtask means incorporating an LLM to do a task. This comes with the limitations of using LLMs in any application, such as added latency and unreliability. Depending on the reasoning capabilities of the LLM, an agent may fail to complete a task sufficiently (or even at all). It is important to incorporate proper failure modes to help an AI agent get unstuck when they are unable to complete a task.
+
+然而，每件事都有两面性。为子任务使用 AI 智能体意味着集成 LLM 来执行任务。这带来了在任何应用程序中使用 LLM 的限制，如增加的延迟和不可靠性。根据 LLM 的推理能力，智能体可能无法充分完成任务（甚至完全无法完成）。重要的是要结合适当的失败模式，以帮助 AI 智能体在无法完成任务时摆脱困境。
+
+## Summary / 总结
+
+This blog discussed the concept of agentic RAG, which involves incorporating agents into the RAG pipeline. Although agents can be used for many different purposes in a RAG pipeline, agentic RAG most often involves using retrieval agents with access to tools to generalize retrieval.
+
+本博客讨论了智能体 RAG 的概念，它涉及将智能体集成到 RAG 流水线中。尽管智能体可以在 RAG 流水线中用于许多不同的目的，但智能体 RAG 最常涉及使用具有工具访问权限的检索智能体来通用化检索。
+
+This article discussed agentic RAG architectures using single-agent and multi-agent systems and their differences from vanilla RAG pipelines.
+
+本文讨论了使用单智能体和多智能体系统的智能体 RAG 架构及其与普通 RAG 流水线的区别。
+
+With the rise and popularity of AI agent systems, many different frameworks are evolving for implementing agentic RAG, such as LlamaIndex, LangGraph, or CrewAI.
+
+随着 AI 智能体系统的兴起和普及，许多不同的框架正在发展以实现智能体 RAG，如 LlamaIndex、LangGraph 或 CrewAI。
+
+Finally, this article discussed the benefits and limitations of agentic RAG pipelines.
+
+最后，本文讨论了智能体 RAG 流水线的优势和局限性。
+
+## Further Resources / 进一步资源
+
+* [Notebook](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/function-calling/openai/openai-swarm.ipynb) using Swarm
+* [Notebook](https://github.com/weaviate/recipes/tree/main/integrations/llm-agent-frameworks/letta) using Letta and Weaviate
+* [Notebooks](https://github.com/weaviate/recipes/tree/main/integrations/llm-agent-frameworks/function-calling/ollama) on using function calling in Ollama
+* [Notebook](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/agentic-rag-benchmark/vanilla-rag-vs-agentic-rag.ipynb) on Vanilla RAG versus Agentic RAG
+
+* [使用 Swarm 的笔记本](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/function-calling/openai/openai-swarm.ipynb)
+* [使用 Letta 和 Weaviate 的笔记本](https://github.com/weaviate/recipes/tree/main/integrations/llm-agent-frameworks/letta)
+* [在 Ollama 中使用函数调用的笔记本](https://github.com/weaviate/recipes/tree/main/integrations/llm-agent-frameworks/function-calling/ollama)
+* [普通 RAG 与智能体 RAG 的笔记本](https://github.com/weaviate/recipes/blob/main/integrations/llm-agent-frameworks/agentic-rag-benchmark/vanilla-rag-vs-agentic-rag.ipynb)
+
+## Ready to start building? / 准备开始构建？
+
+Check out the [Quickstart tutorial](https://docs.weaviate.io/weaviate/quickstart), or build amazing apps with a free trial of [Weaviate Cloud (WCD)](https://console.weaviate.cloud/).
+
+查看[快速入门教程](https://docs.weaviate.io/weaviate/quickstart)，或使用 [Weaviate Cloud (WCD)](https://console.weaviate.cloud/) 的免费试用版构建令人惊叹的应用程序。

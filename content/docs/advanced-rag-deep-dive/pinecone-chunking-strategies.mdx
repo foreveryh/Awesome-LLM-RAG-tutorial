@@ -1,0 +1,207 @@
+---
+title: "Pinecone: Chunking Strategies for LLM Applications | Pinecone：LLM 应用的分块策略"
+description: Learn about chunking strategies for LLM applications, including fixed-size chunking, content-aware chunking, semantic chunking, and contextual chunking. 了解 LLM 应用的分块策略，包括固定大小分块、内容感知分块、语义分块和上下文分块。
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+# Chunking Strategies for LLM Applications
+# LLM 应用的分块策略
+
+In the context of building LLM-related applications, **chunking** is the process of breaking down large text into smaller segments called chunks.
+在构建 LLM 相关应用的背景下，**分块**是将大段文本分解为称为块的较小段落的过程。
+
+It's an essential preprocessing technique that helps optimize the relevance of the content ultimately stored in a vector database. The trick lies in finding chunks that are big enough to contain meaningful information, while small enough to enable performant applications and low latency responses for workloads such as retrieval augmented generation and agentic workflows.
+这是一种 essential 的预处理技术，有助于优化最终存储在向量数据库中的内容的相关性。关键在于找到足够大的块来包含有意义的信息，同时又足够小以支持高性能应用和低延迟响应，适用于检索增强生成和代理工作流等工作负载。
+
+In this post, we'll explore several chunking methods and discuss the tradeoffs needed when choosing a chunking size and method. Finally, we'll give some recommendations for determining the best chunk size and method that will be appropriate for your application.
+在这篇文章中，我们将探讨几种分块方法，并讨论选择分块大小和方法时需要权衡的因素。最后，我们将提供一些建议，帮助确定适合您应用的最佳分块大小和方法。
+
+## Why do we need chunking for our applications?
+## 为什么我们的应用需要分块？
+
+There are two big reasons why chunking is necessary for any application involving vector databases or LLMs: to ensure embedding models can fit the data into their context windows, and to ensure the chunks themselves contain the information necessary for search.
+对于任何涉及向量数据库或 LLM 的应用，分块都是必要的，原因有两个：确保嵌入模型能够将数据适配到其上下文窗口中，以及确保块本身包含搜索所需的信息。
+
+All embedding models have context windows, which determine the amount of information in tokens that can be processed into a single fixed size vector. Exceeding this context window may means the excess tokens are truncated, or thrown away, before being processed into a vector. This is potentially harmful as important context could be removed from the representation of the text, which prevents it from being surfaced during a search.
+所有嵌入模型都有上下文窗口，它决定了可以处理成单个固定大小向量的令牌信息量。超出此上下文窗口可能意味着在处理成向量之前，多余的令牌会被截断或丢弃。这可能有害，因为重要的上下文可能从文本表示中被移除，从而阻止它在搜索过程中被呈现。
+
+Furthermore, it isn't enough just to right-size your data for a model; the resulting chunks must contain information that is relevant to search over. If the chunk contains a set of sentences that aren't useful without context, they may not be surfaced when querying!
+此外，仅仅为模型调整数据大小是不够的；生成的块必须包含与搜索相关的信息。如果块包含一组没有上下文就无用的句子，在查询时可能不会被呈现！
+
+### Chunking's role in semantic search
+### 分块在语义搜索中的作用
+
+For example, in semantic search, we index a corpus of documents, with each document containing valuable information on a specific topic. Due to the way embedding models work, those documents will need to be chunked, and similarity is determined by chunk-level comparisons to the input query vector. Then, these similar chunks are returned back to the user. By finding an effective chunking strategy, we can ensure our search results accurately capture the essence of the user's query.
+例如，在语义搜索中，我们索引一个文档语料库，每个文档包含特定主题的有价值信息。由于嵌入模型的工作方式，这些文档需要被分块，相似性通过块级与输入查询向量的比较来确定。然后，这些相似的块会返回给用户。通过找到有效的分块策略，我们可以确保搜索结果准确捕捉用户查询的精髓。
+
+If our chunks are too small or too large, it may lead to imprecise search results or missed opportunities to surface relevant content. As a rule of thumb, if the chunk of text makes sense without the surrounding context to a human, it will make sense to the language model as well. Therefore, finding the optimal chunk size for the documents in the corpus is crucial to ensuring that the search results are accurate and relevant.
+如果我们的块太小或太大，可能导致不精确的搜索结果或错失呈现相关内容的机会。根据经验，如果文本块对人类来说在没有周围上下文的情况下有意义，对语言模型来说也会有意义。因此，为语料库中的文档找到最佳的块大小对于确保搜索结果准确且相关至关重要。
+
+### Chunking's role for agentic applications and retrieval-augmented generation
+### 分块在代理应用和检索增强生成中的作用
+
+Agents may need access to up-to-date information from databases in order to call tools, make decisions, and respond to user queries. Chunks returned from searches over databases consume context during a session, and ground the agent's responses.
+代理可能需要访问数据库中的最新信息，以便调用工具、做出决策和响应用户查询。从数据库搜索返回的块在会话期间消耗上下文，并为代理的响应提供基础。
+
+We use the embedded chunks to build the context based on a knowledge base the agent has access to. This context grounds the agent in trusted information.
+我们使用嵌入的块基于代理可以访问的知识库来构建上下文。此上下文使代理基于可信信息。
+
+Similar to how semantic search relies on a good chunking strategy to provide usable outputs, agentic applications need meaningful chunks of information in order to proceed. If an agent is misinformed, or provided information without sufficient context, it may waste tokens generating hallucinations or calling the wrong tools.
+类似于语义搜索依赖良好的分块策略来提供可用输出，代理应用需要有意义的信息块才能继续进行。如果代理被误导，或提供的信息缺乏足够的上下文，它可能会浪费令牌生成幻觉或调用错误的工具。
+
+## The Role of Chunking for Long Context LLMs
+## 长上下文 LLM 的分块作用
+
+In some cases, like when using o1 or Claude 4 Sonnet with a 200k context window, un-chunked documents may still fit in context. Still, using large chunks may increase latency and cost in downstream responses.
+在某些情况下，比如使用具有 200k 上下文窗口的 o1 或 Claude 4 Sonnet 时，未分块的文档可能仍适合上下文。但是，使用大块可能会增加下游响应的延迟和成本。
+
+Moreover, long context embedding and LLM models suffer from [the lost-in-the-middle problem](https://arxiv.org/abs/2307.03172), where relevant information buried inside long documents is missed, even when included in generation. The solution to this problem is ensuring the optimal amount of information is passed to a downstream LLM, which necessarily reduces latency and ensures quality.
+此外，长上下文嵌入和 LLM 模型会遭受[中间丢失问题](https://arxiv.org/abs/2307.03172)，即使包含在生成中，长文档中埋藏的相关信息也会被遗漏。解决此问题的方法是确保将最佳数量的信息传递给下游 LLM，这必然会减少延迟并确保质量。
+
+## What should we think about when choosing a chunking strategy?
+## 选择分块策略时应该考虑什么？
+
+Several variables play a role in determining the best chunking strategy, and these variables vary depending on the use case. Here are some key aspects to keep in mind:
+几个变量在确定最佳分块策略中起作用，这些变量根据用例而变化。以下是一些需要记住的关键方面：
+
+1. **What kind of data is being chunked?** Are you working with long documents, such as articles or books, or shorter content, like tweets, product descriptions, or chat messages? Small documents may not need to be chunked at all, while larger ones may exhibit certain structure that will inform chunking strategy, such as sub-headers or chapters.
+1. **正在分块什么类型的数据？** 您处理的是长文档（如文章或书籍），还是短内容（如推文、产品描述或聊天消息）？小文档可能根本不需要分块，而大文档可能表现出某些结构，这些结构将为分块策略提供信息，如子标题或章节。
+
+2. **Which embedding model are you using?** Different embedding models have differing capacities for information, especially on specialized domains like code, finance, medical, or legal information. And, the way these models are trained can strongly affect how they perform in practice. After choosing an appropriate model for your domain, be sure to adapt your chunking strategy to align with expected document types the model has been trained on.
+2. **您使用的是哪种嵌入模型？** 不同的嵌入模型对信息的处理能力不同，特别是在代码、金融、医疗或法律信息等专业领域。这些模型的训练方式会强烈影响它们在实践中的表现。在为您的领域选择适当的模型后，务必调整您的分块策略，使其与模型训练的预期文档类型保持一致。
+
+3. **What are your expectations for the length and complexity of user queries?** Will they be short and specific or long and complex? This may inform the way you choose to chunk your content as well so that there's a closer correlation between the embedded query and embedded chunks.
+3. **您对用户查询的长度和复杂性有什么期望？** 它们会是短而具体，还是长而复杂？这也可能影响您选择分块内容的方式，以便嵌入查询和嵌入块之间有更紧密的相关性。
+
+4. **How will the retrieved results be utilized within your specific application?** For example, will they be used for semantic search, question answering, retrieval augmented generation, or even an agentic workflow? For example, the amount of information a human may review from a search result may be smaller or larger than what an LLM may need to generate a response. These users determine how your data should be represented within the vector database.
+4. **检索结果将如何在您的特定应用中使用？** 例如，它们将用于语义搜索、问答、检索增强生成，甚至代理工作流吗？例如，人类可能从搜索结果中查看的信息量可能小于或大于 LLM 生成响应所需的信息量。这些用户决定了您的数据应如何在向量数据库中表示。
+
+Answering these questions beforehand will allow you to choose a chunking strategy that balances performance and accuracy.
+提前回答这些问题将使您能够选择在性能和准确性之间取得平衡的分块策略。
+
+## Embedding short and long content
+## 嵌入短内容和长内容
+
+When we embed content, we can expect distinct behaviors depending on whether the content is short (like sentences) or long (like paragraphs or entire documents).
+当我们嵌入内容时，根据内容是短（如句子）还是长（如段落或整个文档），我们可以预期不同的行为。
+
+When a **sentence** is embedded, the resulting vector focuses on the sentence's specific meaning. This could be handy in situations where the vector search is used for (sentence-level) classification, recommendation systems, or applications that allow for searches over shorter summaries before longer documents are processed. The search process is then, finding sentences similar in meaning to query sentences or questions. In cases where sentences themselves are considered individual documents, you wouldn't need to chunk at all!
+当**句子**被嵌入时，生成的向量专注于句子的特定含义。这在向量搜索用于（句子级）分类、推荐系统或在处理长文档之前允许搜索较短摘要的应用程序中可能很有用。搜索过程是找到与查询句子或问题在含义上相似的句子。在句子本身被视为单个文档的情况下，您根本不需要分块！
+
+When a **full paragraph or document** is embedded, the embedding process considers both the overall context and the relationships between the sentences and phrases within the text. This can result in a more comprehensive vector representation that captures the broader meaning and themes of the text. Larger input text sizes, on the other hand, may introduce noise or dilute the significance of individual sentences or phrases, making finding precise matches when querying the index more difficult. These chunks help support use cases such as question-answering, where answers may be a few paragraphs or more. Many modern AI applications work with longer documents, which almost always require chunking.
+当**完整段落或文档**被嵌入时，嵌入过程会考虑整体上下文以及文本中句子和短语之间的关系。这可以产生更全面的向量表示，捕捉文本的更广泛含义和主题。另一方面，较大的输入文本大小可能会引入噪声或稀释单个句子或短语的重要性，使得在查询索引时找到精确匹配更加困难。这些块有助于支持问答等用例，其中答案可能是几个段落或更多。许多现代 AI 应用处理长文档，这几乎总是需要分块。
+
+## Chunking methods
+## 分块方法
+
+### Fixed-size chunking
+### 固定大小分块
+
+This is the most common and straightforward approach to chunking: we simply decide the number of tokens in our chunk, and use this number to break up our documents into fixed size chunks. Usually, this number is the max context window size of the embedding model (such as 1024 for llama-text-embed-v2, or 8196 for text-embedding-3-small). Keep in mind that different embedding models may tokenize text differently, so you will need to estimate token counts accurately.
+这是最常见和直接的分块方法：我们简单地决定块中的令牌数量，并使用这个数字将文档分解为固定大小的块。通常，这个数字是嵌入模型的最大上下文窗口大小（如 llama-text-embed-v2 的 1024，或 text-embedding-3-small 的 8196）。请记住，不同的嵌入模型可能以不同方式对文本进行标记，因此您需要准确估计令牌计数。
+
+Fixed-sized chunking will be the best path in most cases, and we recommend starting here and iterating only after determining it insufficient.
+在大多数情况下，固定大小分块将是最佳路径，我们建议从这里开始，只有在确定其不足后才进行迭代。
+
+### "Content-aware" Chunking
+### "内容感知"分块
+
+Although fixed-size chunking is quite easy to implement, it can ignore critical structure within documents that can be used to inform relevant chunks. Content-aware chunking refers to strategies that adhere to structure to help inform the meaning of our chunks.
+尽管固定大小分块很容易实现，但它可能忽略文档内可用于形成相关块的关键结构。内容感知分块是指遵循结构以帮助形成我们块含义的策略。
+
+#### Simple Sentence and Paragraph splitting
+#### 简单句子和段落分割
+
+As we mentioned before, some embedding models are optimized for embedding sentence-level content. But sometimes, sentences need to be mined from larger text datasets that aren't preprocessed. In these cases, it's necessary to use sentence chunking, and there are several approaches and tools available to do this:
+正如我们之前提到的，一些嵌入模型针对嵌入句子级内容进行了优化。但有时，需要从未经预处理的大型文本数据集中挖掘句子。在这些情况下，有必要使用句子分块，有几种方法和工具可以做到这一点：
+
+* **Naive splitting:** The most naive approach would be to split sentences by periods ("."), new lines, or white space.
+* **简单分割：** 最简单的方法是按句号（"."）、换行符或空格分割句子。
+
+* [**NLTK**](https://www.nltk.org/): The Natural Language Toolkit (NLTK) is a popular Python library for working with human language data. It provides a trained sentence tokenizer that can split the text into sentences, helping to create more meaningful chunks.
+* [**NLTK**](https://www.nltk.org/): 自然语言工具包（NLTK）是一个流行的 Python 库，用于处理人类语言数据。它提供了一个训练好的句子标记器，可以将文本分割成句子，帮助创建更有意义的块。
+
+* [**spaCy**](https://spacy.io/): spaCy is another powerful Python library for NLP tasks. It offers a sophisticated sentence segmentation feature that can efficiently divide the text into separate sentences, enabling better context preservation in the resulting chunks.
+* [**spaCy**](https://spacy.io/): spaCy 是另一个强大的 Python NLP 任务库。它提供了一个复杂的句子分割功能，可以有效地将文本分割成单独的句子，使生成的块中更好地保留上下文。
+
+#### Recursive Character Level Chunking
+#### 递归字符级分块
+
+LangChain implements a [RecursiveCharacterTextSplitter](https://python.langchain.com/docs/how_to/recursive_text_splitter/) that tries to split text using separators in a given order. The default behavior of the splitter uses the ["\n\n", "\n", " ", ""] separators to break paragraphs, sentences and words depending on a given chunk size.
+LangChain 实现了一个 [RecursiveCharacterTextSplitter](https://python.langchain.com/docs/how_to/recursive_text_splitter/)，它尝试使用给定顺序的分隔符来分割文本。分割器的默认行为使用 ["\n\n", "\n", " ", ""] 分隔符根据给定的块大小来分割段落、句子和单词。
+
+This is a great middle ground between always splitting on a specific character and using a more semantic splitter, while also ensuring fixed chunk sizes when possible.
+这是在始终按特定字符分割和使用更语义的分割器之间的一个很好的折中，同时也在可能时确保固定块大小。
+
+### Document structure-based chunking
+### 基于文档结构的分块
+
+When chunking large documents such as PDFs, DOCX, HTML, code snippets, Markdown files and LaTex, specialized chunking methods can help preserve the original structure of the content during chunk creation.
+当分块大型文档如 PDF、DOCX、HTML、代码片段、Markdown 文件和 LaTex 时，专门的分块方法可以帮助在创建块期间保留内容的原始结构。
+
+* PDF documents contain loads of headers, text, tables, and other bits and pieces that require preprocessing to chunk. LangChain has some handy utilities to help process these documents, while Pinecone Assistant can [chunk and processes these for you](https://docs.pinecone.io/guides/assistant/files-overview)
+* PDF 文档包含大量标题、文本、表格和其他需要预处理才能分块的片段。LangChain 有一些实用工具来帮助处理这些文档，而 Pinecone Assistant 可以[为您分块和处理这些文档](https://docs.pinecone.io/guides/assistant/files-overview)
+
+* HTML, from scraped web pages can contain tags (`<p>` for paragraphs, or `<title>` for titles) that can inform text to be broken up or identified, like on product pages or blog posts. Roll your own parser, or use [LangChain splitters here to process these for chunking](https://python.langchain.com/docs/how_to/split_html/)
+* HTML，从抓取的网页可以包含标签（段落用 `<p>`，标题用 `<title>`），可以通知文本如何分割或识别，如在产品页面或博客文章中。滚动您自己的解析器，或使用[LangChain 分割器来处理这些以进行分块](https://python.langchain.com/docs/how_to/split_html/)
+
+* [**Markdown**](https://www.markdownguide.org/): Markdown is a lightweight markup language commonly used for formatting text. By recognizing the Markdown syntax (e.g., headings, lists, and code blocks), you can intelligently divide the content based on its structure and hierarchy, resulting in more semantically coherent chunks.
+* [**Markdown**](https://www.markdownguide.org/): Markdown 是一种轻量级标记语言，常用于格式化文本。通过识别 Markdown 语法（如标题、列表和代码块），您可以根据其结构和层次智能地分割内容，从而产生更具语义连贯性的块。
+
+* [**LaTex**](https://www.latex-project.org/): LaTeX is a document preparation system and markup language often used for academic papers and technical documents. By parsing the LaTeX commands and environments, you can create chunks that respect the logical organization of the content (e.g., sections, subsections, and equations), leading to more accurate and contextually relevant results.
+* [**LaTex**](https://www.latex-project.org/): LaTeX 是一种文档准备系统和标记语言，常用于学术论文和技术文档。通过解析 LaTeX 命令和环境，您可以创建尊重内容逻辑组织（如章节、小节和方程）的块，从而产生更准确和上下文相关的结果。
+
+### Semantic Chunking
+### 语义分块
+
+A new experimental technique for approaching chunking was first introduced by [Greg Kamradt](https://www.linkedin.com/in/gregkamradt/). [In his notebook](https://github.com/FullStackRetrieval-com/RetrievalTutorials/blob/main/tutorials/LevelsOfTextSplitting/5_Levels_Of_Text_Splitting.ipynb), Kamradt rightfully points to the fact that a global chunking size may be too trivial of a mechanism to take into account the **meaning** of segments within the document. If we use this type of mechanism, we can't know if we're combining segments that have anything to do with one another.
+一种新的分块实验技术首次由 [Greg Kamradt](https://www.linkedin.com/in/gregkamradt/) 引入。[在他的笔记本中](https://github.com/FullStackRetrieval-com/RetrievalTutorials/blob/main/tutorials/LevelsOfTextSplitting/5_Levels_Of_Text_Splitting.ipynb)，Kamradt 正确地指出，全局分块大小可能是考虑文档内段落**含义**的过于简单的机制。如果我们使用这种机制，我们无法知道我们组合的段落是否彼此相关。
+
+Luckily, if you're building an application with LLMs, you most likely already have the ability to create **embeddings -** and embeddings can be used to extract the semantic meaning present in your data. This semantic analysis can be used to create chunks that are made up of sentences that talk about the same theme or topic.
+幸运的是，如果您正在构建 LLM 应用，您很可能已经具备创建**嵌入**的能力——嵌入可以用来提取数据中存在的语义含义。这种语义分析可以用来创建由讨论相同主题或话题的句子组成的块。
+
+Semantic chunking involves breaking a document into sentences, grouping each sentence with its surrounding sentences, and generating embeddings for these groups. By comparing the semantic distance between each group and its predecessor, you can identify where the topic or theme shifts, which defines the chunk boundaries. [You can learn more about applying semantic chunking with Pinecone here.](https://github.com/pinecone-io/examples/blob/master/learn/generation/better-rag/02b-semantic-chunking.ipynb)
+语义分块涉及将文档分解为句子，将每个句子与其周围的句子分组，并为这些组生成嵌入。通过比较每组与其前一组之间的语义距离，您可以识别主题或话题转换的位置，这定义了块边界。[您可以在这里了解更多关于使用 Pinecone 应用语义分块的信息。](https://github.com/pinecone-io/examples/blob/master/learn/generation/better-rag/02b-semantic-chunking.ipynb)
+
+### Contextual Chunking with LLMs
+### 使用 LLM 的上下文分块
+
+Sometimes, it's not possible to chunk information from a larger complex document without losing the context entirely. This can happen when the documents are many hundreds of pages, change topics frequently, or require understanding from many related portions of the document. Anthropic introduced [contextual retrieval in 2024](https://www.anthropic.com/news/contextual-retrieval) to help address this problem.
+有时，无法在不完全丢失上下文的情况下从较大的复杂文档中分块信息。当文档有数百页、频繁更改主题或需要理解文档的许多相关部分时，就会发生这种情况。Anthropic 在 2024 年引入了[上下文检索](https://www.anthropic.com/news/contextual-retrieval)来帮助解决这个问题。
+
+Anthropic prompted a Claude instance with an entire document and it's chunk, in order to generate a contextualized description, which is appended to the chunk and then embedded. The description helps retain the high-level summary meaning of the document to the chunk, which exposes this information to incoming queries. To avoid processing the document each time, it's cached within the prompt for all necessary chunks. [You can learn more about contextual retrieval in our video here](https://www.youtube.com/watch?v=u-ocR-2P_YA) and [our code example here.](https://github.com/pinecone-io/contextual-webinar-rag/tree/main)
+Anthropic 用整个文档及其块提示 Claude 实例，以生成上下文化描述，该描述附加到块中然后嵌入。描述有助于保留文档到块的高级摘要含义，这将此信息暴露给传入查询。为避免每次处理文档，它在提示中为所有必要的块进行缓存。[您可以在这里的视频中了解更多关于上下文检索的信息](https://www.youtube.com/watch?v=u-ocR-2P_YA)和[我们的代码示例。](https://github.com/pinecone-io/contextual-webinar-rag/tree/main)
+
+## Figuring out the best chunking strategy for your application
+## 为您的应用确定最佳分块策略
+
+Here are some pointers to help decide a strategy if fixed chunking doesn't easily apply to your use case.
+如果固定分块不容易适用于您的用例，以下是一些帮助决定策略的指针。
+
+* **Selecting a Range of Chunk Sizes** - Once your data is preprocessed, the next step is to choose a range of potential chunk sizes to test. As mentioned previously, the choice should take into account the nature of the content (e.g., short messages or lengthy documents), the embedding model you'll use, and its capabilities (e.g., token limits). The objective is to find a balance between preserving context and maintaining accuracy. Start by exploring a variety of chunk sizes, including smaller chunks (e.g., 128 or 256 tokens) for capturing more granular semantic information and larger chunks (e.g., 512 or 1024 tokens) for retaining more context.
+* **选择块大小范围** - 一旦您的数据被预处理，下一步就是选择一系列潜在的块大小进行测试。如前所述，选择应考虑内容的性质（如短消息或长文档）、您将使用的嵌入模型及其能力（如令牌限制）。目标是在保留上下文和保持准确性之间找到平衡。首先探索各种块大小，包括较小的块（如 128 或 256 个令牌）以捕获更细粒度的语义信息，和较大的块（如 512 或 1024 个令牌）以保留更多上下文。
+
+* **Evaluating the Performance of Each Chunk Size** - In order to test various chunk sizes, you can either use multiple indices or a single index with multiple [namespaces](https://docs.pinecone.io/docs/namespaces). With a representative dataset, create the embeddings for the chunk sizes you want to test and save them in your index (or indices). You can then run a series of queries for which you can evaluate quality, and compare the performance of the various chunk sizes. This is most likely to be an iterative process, where you test different chunk sizes against different queries until you can determine the best-performing chunk size for your content and expected queries.
+* **评估每个块大小的性能** - 为了测试各种块大小，您可以使用多个索引或带有多个[namespaces](https://docs.pinecone.io/docs/namespaces)的单个索引。使用代表性数据集，为要测试的块大小创建嵌入并保存在您的索引中。然后您可以运行一系列可以评估质量的查询，并比较各种块大小的性能。这很可能是一个迭代过程，您针对不同查询测试不同块大小，直到确定适合您内容和预期查询的最佳性能块大小。
+
+### Post-processing chunks with chunk expansion
+### 使用块扩展对块进行后处理
+
+It's important to remember that you aren't entirely married to your chunking strategy. When querying chunked data in a vector database, the retrieved information is typically the top semantically similar chunks given a user query. But users, agents or LLMs may need more surrounding context in order to adequately interpret the chunk.
+重要的是要记住，您并不完全依赖于您的分块策略。在向量数据库中查询分块数据时，检索到的信息通常是给定用户查询的顶部语义相似块。但用户、代理或 LLM 可能需要更多周围上下文才能充分解释块。
+
+Chunk expansion is an easy way to post-process chunked data from a database, by retrieving neighboring chunks within a window for each chunk in a retrieved set of chunks. Chunks could be expanded to paragraphs, pages, or even whole documents depending on your use case.
+块扩展是从数据库中对分块数据进行后处理的简单方法，通过为检索到的块集中的每个块在窗口内检索相邻块。根据您的用例，块可以扩展到段落、页面，甚至整个文档。
+
+Coupling a chunking strategy with a good chunk expansion on querying can ensure low latency searches without compromising on context.
+将分块策略与查询时的良好块扩展相结合，可以确保低延迟搜索而不会损害上下文。
+
+## Wrapping up
+## 总结
+
+Chunking your content is may appear straightforward in most cases - but it could present some challenges when you start wandering off the beaten path. There's no one-size-fits-all solution to chunking, so what works for one use case may not work for another.
+在大多数情况下，分块您的内容可能看起来很简单 - 但当您开始偏离常规路径时，它可能会带来一些挑战。分块没有一刀切的解决方案，所以适用于一个用例的方法可能不适用于另一个。
+
+Want to get started experimenting with chunking strategies? Create a [free Pinecone account](https://app.pinecone.io/) and check out our [example notebooks](https://docs.pinecone.io/examples/notebooks) to implement chunking via various applications like semantic search, retrieval augmented generation or agentic applications with Pinecone.
+想要开始试验分块策略吗？创建一个[免费的 Pinecone 账户](https://app.pinecone.io/)并查看我们的[示例笔记本](https://docs.pinecone.io/examples/notebooks)，通过各种应用如语义搜索、检索增强生成或使用 Pinecone 的代理应用来实现分块。

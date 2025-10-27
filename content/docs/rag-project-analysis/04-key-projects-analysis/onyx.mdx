@@ -1,0 +1,146 @@
+---
+title: onyx 深度解析
+description: 多租户/RBAC/审计、LangGraph 工作流与 Vespa 混合检索（企业级）
+---
+
+<Callout type="success" title="为什么是 onyx">
+面向企业生产环境：多租户隔离、权限与审计、工作流与可观测性齐备，检索端支持 Vespa 混检与两阶段排序。
+</Callout>
+
+# onyx 深度解析
+
+## 架构蓝图
+
+```mermaid
+graph TB
+  UI[Web/Slack] --> API
+  API --> Auth[Auth/RBAC]
+  API --> WF[LangGraph Workflow]
+  WF --> Ingest[解析/分块/入库]
+  WF --> Retrieve[混检+重排]
+  Retrieve --> Gen[生成+引用]
+  subgraph Data
+    PG[(Postgres: users/tenants/audit)]
+    Vespa[(Vespa: vector+BM25)]
+    Obj[(Object Storage)]
+  end
+  API --> PG
+  WF --> Vespa
+  Ingest --> Obj
+```
+
+## 多租户/RBAC/审计
+
+```python title="权限与审计骨架" path=null start=null
+class RBAC:
+    def has_permission(self, user_id: str, action: str, resource: dict) -> bool:
+        # 角色/组/用户三级 + 最小权限
+        ...
+
+async def audit_log(event_type: str, tenant_id: str, user_id: str, payload: dict):
+    # 写入 Postgres 审计表（包含 ip, ua, request_id, doc_ids）
+    ...
+```
+
+要点：
+- 资源域：workspace/tenant 前缀强约束，任何查询必须带租户过滤
+- 审计：查询/文档访问/权限变更均入审计流，保留≥12个月
+
+## LangGraph 工作流
+
+```python title="工作流节点（示意）" path=null start=null
+from langgraph import StateGraph
+
+g = StateGraph()
+@g.node('ingest')
+async def ingest_node(ctx):
+    # 解析→分块→embedding→索引写入
+    ...
+
+@g.node('retrieve')
+async def retrieve_node(ctx):
+    # Vespa 混检 + 重排 + 过滤
+    ...
+
+@g.node('generate')
+async def generate_node(ctx):
+    # Prompt 分层 + 引用输出
+    ...
+
+@g.edge('ingest','retrieve')
+@g.edge('retrieve','generate')
+async def edges(ctx): ...
+```
+
+- 有状态节点：可重试/回放；失败进入补偿或死信
+- 观测：节点耗时、错误栈、输入输出大小
+
+## Vespa 混合检索（YQL + Ranking Profile）
+
+```python title="YQL 与排序参数" path=null start=null
+yql = f"""
+SELECT * FROM documents WHERE (
+   ({targetHits:100}nearestNeighbor(content_embedding, query_embedding)) OR
+   ({targetHits:100}nearestNeighbor(title_embedding, query_embedding)) OR
+   ({grammar:\"weakAnd\"}userInput(@query)) OR
+   ({defaultIndex:\"content_summary\"}userInput(@query))
+) AND tenant_id={tenant_id}
+"""
+ranking = {
+  "profile": "hybrid_with_time_decay",
+  "parameters": {
+    "alpha": 0.5,                # 向量:BM25 权重
+    "title_boost": 2.0,          # 标题加权
+    "time_decay": "exp(-1.0 * max(0, now() - attribute(created_at))/86400)"  # 新文档优先
+  }
+}
+```
+
+两阶段排序（first-phase 粗排 + second-phase 精排），可加入行为特征。
+
+## 最小可运行样例（Compose）
+
+```yaml title="docker-compose.yml" path=null start=null
+version: '3.8'
+services:
+  api:
+    image: onyx-api:latest
+    environment:
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/onyx
+      - VESPA_ENDPOINT=http://vespa:8080
+    ports: ["8000:8000"]
+    depends_on: [postgres, vespa]
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=onyx
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+  vespa:
+    image: vespaengine/vespa
+    ports: ["8080:8080"]
+```
+
+## 调参实验（企业关注）
+
+- alpha ∈ {0.3,0.5,0.7}；time_decay ∈ {0.5,1.0,2.0}（指数系数）
+- 指标：Recall@5/NDCG@10、P95 延迟、不同租户 QPS 隔离效果
+
+## 风险与坑
+
+- YQL 拼接注意转义与注入；必须带 tenant 过滤
+- RankingProfile 与 Schema 变更需滚动发布（蓝绿/金丝雀）
+- 审计数据量大：分区表/归档策略/只写追加
+
+## 迁移指南
+
+- 抽象检索接口：支持 Vespa/向量库/全文引擎并存
+- 权限中间件先行：接口层拦截 + 租户注入 + 只读/审计绕行
+- 工作流节点可替换：检索与生成作为独立 DAG
+
+## 参考
+
+- Onyx 项目主页与文档
+- Vespa Docs（YQL/Ranking/Hybrid）
+- 企业审计与合规（GDPR/SOC2）
+- LangGraph 工作流最佳实践
