@@ -1107,9 +1107,9 @@ class JavaScriptAdapter:
         """提取 import 语句"""
         import re
         # import x from 'module'
-        imports = re.findall(r"import.*from\s+['\"](.+)['\"]", content)
+        imports = re.findall(r"import.*from\s+['\"](/docs/rag-project-analysis/04-application-scenarios/.+)['\"]", content)
         # require('module')
-        imports += re.findall(r"require\(['\"](.+)['\"]\)", content)
+        imports += re.findall(r"require\(['\"](/docs/rag-project-analysis/04-application-scenarios/.+)['\"]\)", content)
         return imports
     
     def is_test_file(self, file_path: str) -> bool:
@@ -1167,4 +1167,4 @@ class JavaScriptAdapter:
 - continue.dev - VS Code AI 插件
 - GitHub Copilot - 代码补全
 
-**下一步**：了解 [多模态 RAG](./04-多模态RAG) 的图像与表格处理。
+**下一步**：了解 [多模态 RAG](/docs/rag-project-analysis/04-application-scenarios/./04-多模态RAG) 的图像与表格处理。

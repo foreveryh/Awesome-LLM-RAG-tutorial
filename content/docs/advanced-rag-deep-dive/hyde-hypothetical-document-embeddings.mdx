@@ -54,7 +54,7 @@ Problem: In traditional dense retrieval methods, we typically encode queries and
 
 Dense retrieval models commonly based on neural networks, such as transformer-based encoders, are designed to produce fixed-dimensional vectors for semantically related entities (such as queries and documents). Using architectures like siamese networks, these models are trained to minimize the distance between similar pairs (positive examples) and maximize the distance between dissimilar pairs (negative examples), typically using triplet loss. This is the triplet loss formula:
 
-![三元组损失公式](./hyde-images/The_triplet_loss_formula_fef8fc883e_5c5eec8871.png)
+![三元组损失公式](/images/hyde-images/The_triplet_loss_formula_fef8fc883e_5c5eec8871.png)
 
 _三元组损失公式_
 _Triplet Loss Formula_
@@ -63,7 +63,7 @@ _Triplet Loss Formula_
 
 Where a is the anchor, p is the positive example, n is the negative example, d is the distance function, and λ is the margin value that ensures sufficient distance between negative examples.
 
-![图 1：在余弦相似性中的三元组损失说明](./hyde-images/Fig_1_Illustration_of_Triplet_Loss_in_Cosine_Similarity_a827dc6b9d_0d0e4b3991.png)
+![图 1：在余弦相似性中的三元组损失说明](/images/hyde-images/Fig_1_Illustration_of_Triplet_Loss_in_Cosine_Similarity_a827dc6b9d_0d0e4b3991.png)
 
 _图 1：在余弦相似性中的三元组损失说明_
 _Figure 1: Illustration of Triplet Loss in Cosine Similarity_
@@ -76,7 +76,7 @@ The main challenges of these dense retrieval systems are the need for large labe
 
 Solution: The HyDE solution combines the advantages of generative Large Language Models (LLMs) and contrastive encoders. At the core of HyDE is using a large language model to generate hypothetical answers to queries; these answers are then embedded into vector space. This approach allows for the effective retrieval of actual documents based on their similarity to the generated hypothetical documents, bypassing the need for task-specific training data. Let's look at the architecture and understand it step by step:
 
-![图 2：HyDE 模型说明](./hyde-images/Fig_2_Illustration_of_Hy_DE_model_258ef062f7_79c0edf0fb.png)
+![图 2：HyDE 模型说明](/images/hyde-images/Fig_2_Illustration_of_Hy_DE_model_258ef062f7_79c0edf0fb.png)
 
 _图 2：HyDE 模型说明_
 _Figure 2: HyDE Model Illustration_
@@ -265,7 +265,7 @@ We first set up the environment and Milvus vector database, defined our corpus, 
 
 Retrieval-Augmented Generation (RAG) integrates generative Large Language Models (LLMs) with traditional information retrieval systems. This approach allows LLMs to generate contextually informed answers, explanations, or instructions in natural language. A basic RAG (including a vector database like Milvus, an embedding model, and an LLM) is usually easier to implement, but its performance and accuracy in real-world applications depend on optimizing retrieval elements.
 
-![图 3：RAG 的基本架构](./hyde-images/RAG_chatbot_2f1ff9ec07_d242a7126f.png)
+![图 3：RAG 的基本架构](/images/hyde-images/RAG_chatbot_2f1ff9ec07_d242a7126f.png)
 
 _图 3：RAG 的基本架构_
 _Figure 3: Basic Architecture of RAG_

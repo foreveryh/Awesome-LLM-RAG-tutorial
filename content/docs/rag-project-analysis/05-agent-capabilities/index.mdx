@@ -32,7 +32,7 @@ class ReactAgent:
             scratch.append(thought)
             if action == "finish":
                 return action_input
-            obs = await self.tools[action](action_input)
+            obs = await self.tools[action](/docs/rag-project-analysis/05-agent-capabilities/action_input)
         return "Reached max steps without conclusion"
 ```
 

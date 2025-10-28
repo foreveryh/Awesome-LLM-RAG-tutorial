@@ -54,7 +54,7 @@ This retrieval augmented generation (RAG) workflow involves three key stages: un
 
 这种检索增强生成（RAG）工作流程涉及三个关键阶段：理解查询、检索信息和生成响应。这些步骤在各种用例中保持一致，从构建基本的RAG应用到扩展为生产就绪的管道。
 
-![Image 1](./neo4j-rag-tutorial-images/retrieval-augmented-generation.png)
+![Image 1](/images/neo4j-rag-tutorial-images/retrieval-augmented-generation.png)
 
 1.   **Retrieval:** The retrieval system uses embedding models to retrieve relevant information from external sources — such as documents, wikis, task systems, or databases — based on a user's query. The retrieval process often uses semantic similarity (via vector search) or structured filtering to identify the most pertinent content. The system ranks and scores these results for relevance.
 
@@ -156,7 +156,7 @@ Let's take a look at what the GraphRAG architecture looks like:
 
 让我们看看GraphRAG架构是什么样的：
 
-![Image 2](./neo4j-rag-tutorial-images/graphrag-architecture-1-939x1024.png)
+![Image 2](/images/neo4j-rag-tutorial-images/graphrag-architecture-1-939x1024.png)
 
 This combination of a knowledge graph and vector search is particularly effective when your application requires:
 
@@ -281,7 +281,7 @@ Knowledge graphs excel at connecting information from multiple data sources. Whe
 
 知识图谱擅长连接来自多个数据源的信息。在开发DevOps RAG应用时，您可以从云服务、任务管理工具等获取信息。
 
-![Image 3](./neo4j-rag-tutorial-images/import-knowledge-graph.png)
+![Image 3](/images/neo4j-rag-tutorial-images/import-knowledge-graph.png)
 
 Combining multiple data sources into a knowledge graph. Image by author.
 
@@ -305,7 +305,7 @@ You should see a similar visualization of the graph in the Neo4j Browser:
 
 您应该在Neo4j浏览器中看到类似的图可视化：
 
-![Image 4](./neo4j-rag-tutorial-images/1k9jUdnEB8sR5g0fZzqSiNA.png)
+![Image 4](/images/neo4j-rag-tutorial-images/1k9jUdnEB8sR5g0fZzqSiNA.png)
 
 Subset of the DevOps graph. Image by author.
 
@@ -468,7 +468,7 @@ The result is the following:
 
 结果如下：
 
-![Image 5: GraphCypherQAChain](./neo4j-rag-tutorial-images/1VVWecqvibBb2vVXuyKU5rw.png)
+![Image 5: GraphCypherQAChain](/images/neo4j-rag-tutorial-images/1VVWecqvibBb2vVXuyKU5rw.png)
 
 You can also ask the chain to aggregate the data using various grouping keys:
 
@@ -484,7 +484,7 @@ The result is the following:
 
 结果如下：
 
-![Image 6: Aggregate the data using various grouping keys.](./neo4j-rag-tutorial-images/1GFJ9_TnLk2oDnVGtXAwARw.png)
+![Image 6: Aggregate the data using various grouping keys.](/images/neo4j-rag-tutorial-images/1GFJ9_TnLk2oDnVGtXAwARw.png)
 
 You might say these aggregations are not graph-based operations, and that's correct. We can, of course, perform more graph-based operations like traversing the dependency graph of microservices.
 
@@ -500,7 +500,7 @@ The result is the following:
 
 结果如下：
 
-![Image 7: Traversing the dependency graph of microservices.](./neo4j-rag-tutorial-images/1Jp-QxrEj_IYlOga84KTyBw.png)
+![Image 7: Traversing the dependency graph of microservices.](/images/neo4j-rag-tutorial-images/1Jp-QxrEj_IYlOga84KTyBw.png)
 
 Of course, you can also ask the chain to produce [variable-length path traversals](https://graphaware.com/graphaware/2015/05/19/neo4j-cypher-variable-length-relationships-by-example.html) by asking questions like:
 
@@ -516,7 +516,7 @@ The result is the following:
 
 结果如下：
 
-![Image 8: Variable-length path traversals](./neo4j-rag-tutorial-images/1chHcyzoxurmTuzVsYgrdLA.png)
+![Image 8: Variable-length path traversals](/images/neo4j-rag-tutorial-images/1chHcyzoxurmTuzVsYgrdLA.png)
 
 The overlap in mentioned services comes from the structure of the dependency graph, not from an invalid Cypher statement.
 
@@ -745,7 +745,7 @@ Start with the tutorial above and try running your own questions through the Dev
 
 从上面的教程开始，尝试通过DevOps示例运行您自己的问题。从那里，插入您自己的数据——支持工单、产品规格、销售内容或工作流——看看更智能的RAG系统能解锁什么。
 
-![Image 9](./neo4j-rag-tutorial-images/Essential-GraphRAG.png)
+![Image 9](/images/neo4j-rag-tutorial-images/Essential-GraphRAG.png)
 
 **Additional Resources**
 **附加资源**
@@ -762,4 +762,4 @@ To deepen your understanding or get hands-on with other aspects of RAG and knowl
 *   [Neo4j GraphAcademy –](https://graphacademy.neo4j.com/)[Neo4j & Generative AI Fundamentals](https://graphacademy.neo4j.com/courses/genai-fundamentals/?category=generative-ai)
 *   [GraphRAG DevOps Example on GitHub](https://github.com/tomasonjo/langchain-neo4j)
 
-![Image 9](./neo4j-rag-tutorial-images/Essential-GraphRAG.png)
+![Image 9](/images/neo4j-rag-tutorial-images/Essential-GraphRAG.png)

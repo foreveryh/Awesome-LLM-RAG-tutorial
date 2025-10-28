@@ -44,7 +44,7 @@ description: 基于9个代表性开源项目的深度剖析，从架构设计到
     - ⭐ 适合：快速原型开发
   </Card>
   
-  <Card title="RAG-Anything" href="https://github.com/yisuanwang/rag-anything">
+  <Card title="RAG-Anything" href="https://github.com/HKUDS/RAG-Anything">
     **多模态领先者**
     - PDF 图表/表格/公式解析
     - 视觉检索（ColPali）
@@ -62,7 +62,7 @@ description: 基于9个代表性开源项目的深度剖析，从架构设计到
 </Cards>
 
 <Cards>
-  <Card title="SurfSense" href="https://github.com/HKUDS/SurfSense">
+  <Card title="SurfSense" href="https://github.com/MODSetter/SurfSense">
     **研究检索代理**
     - 混合检索 + 重排序
     - 丰富的数据连接器
@@ -70,7 +70,7 @@ description: 基于9个代表性开源项目的深度剖析，从架构设计到
     - ⭐ 适合：学术/研究场景
   </Card>
   
-  <Card title="Self-Corrective-Agentic-RAG" href="https://github.com/langchain-ai/langgraph/tree/main/examples/rag">
+  <Card title="Self-Corrective-Agentic-RAG" href="https://github.com/PranavGovindu/Self-Corrective-Agentic-RAG">
     **自纠正 RAG**
     - CRAG（Corrective RAG）
     - 幻觉检测
@@ -94,7 +94,7 @@ description: 基于9个代表性开源项目的深度剖析，从架构设计到
     - ⭐ 适合：快速验证 POC
   </Card>
   
-  <Card title="UltraRAG" href="https://github.com/tigergraph/UltraRAG">
+  <Card title="UltraRAG" href="https://github.com/OpenBMB/UltraRAG">
     **MCP 架构**
     - Model Context Protocol
     - 图数据库优势
@@ -121,14 +121,14 @@ description: 基于9个代表性开源项目的深度剖析，从架构设计到
 
 ### 📋 第一部分：全局视角（总）
 
-**[01-项目全景对比](./01-项目全景对比)**
+**[01-项目全景对比](/docs/rag-project-analysis/./01-project-overview)**
 - 9 个项目的技术栈、架构模式、适用场景对比
 - 选型决策树：根据需求快速定位合适项目
 - 技术债务与风险评估
 
 ### 🔧 第二部分：技术深度（分）
 
-**[02-Pipeline节点深度剖析](./02-Pipeline节点深度剖析)**
+**[02-Pipeline节点深度剖析](/docs/rag-project-analysis/./02-pipeline-deep-dive)**
 - 检索架构设计（向量/图谱/混合）
 - Embedding 选型（OpenAI/本地模型/多模态）
 - 生成优化（Prompt 工程/流式输出/缓存）
@@ -138,19 +138,19 @@ description: 基于9个代表性开源项目的深度剖析，从架构设计到
 - 向量索引优化（HNSW/IVF/量化）
 - 元数据管理（结构化/过滤/聚合）
 
-**[03-企业级系统设计](./03-企业级系统设计)**
+**[03-企业级系统设计](/docs/rag-project-analysis/./03-enterprise-system-design)**
 - 架构模式（单体/微服务/Serverless）
 - 多租户与权限控制（RBAC/数据隔离）
 - 可观测性（监控/日志/追踪）
 - 安全与合规（加密/审计/GDPR）
 
-**[04-重点项目深度解析](./04-重点项目深度解析)**
+**[04-重点项目深度解析](/docs/rag-project-analysis/./04-key-projects-analysis)**
 - onyx 企业级实战
 - LightRAG 架构解析
 - RAG-Anything 多模态方案
 - kotaemon 可视化设计
 
-**[05-Agent能力与实践](./05-Agent能力与实践)**
+**[05-Agent能力与实践](/docs/rag-project-analysis/./05-agent-capabilities)**
 - ReAct/Plan-and-Execute 模式
 - LangGraph 工作流编排
 - Self-Corrective RAG 实现
@@ -158,7 +158,7 @@ description: 基于9个代表性开源项目的深度剖析，从架构设计到
 
 ### 🎯 第三部分：应用落地（总）
 
-**[04-应用场景实战](./04-应用场景实战)**
+**[04-应用场景实战](/docs/rag-project-analysis/./04-application-scenarios)**
 - **企业知识库 RAG**：多租户、权限控制、审计合规
 - **个人知识管理 RAG**：本地部署、隐私保护、Obsidian/Notion 集成
 - **代码库问答 RAG**：AST 解析、语义检索、API 文档生成
@@ -171,39 +171,39 @@ description: 基于9个代表性开源项目的深度剖析，从架构设计到
 
 | 场景 | 推荐项目 | 关键文档 |
 |------|---------|----------|
-| 🏢 **企业知识库** | onyx | [企业知识库RAG](./04-application-scenarios/01-enterprise-knowledge-base) |
-| 👤 **个人笔记** | LightRAG | [个人知识管理RAG](./04-application-scenarios/02-personal-knowledge-management) |
-| 💻 **代码问答** | sweep.ai + LightRAG | [代码库问答RAG](./04-application-scenarios/03-code-qa) |
-| 📊 **多模态文档** | RAG-Anything | [多模态RAG](./04-application-scenarios/04-multimodal-rag) |
-| 💬 **智能客服** | onyx + FAQ系统 | [客服问答系统](./04-application-scenarios/05-customer-service) |
+| 🏢 **企业知识库** | onyx | [企业知识库RAG](/docs/rag-project-analysis/./04-application-scenarios/01-enterprise-knowledge-base) |
+| 👤 **个人笔记** | LightRAG | [个人知识管理RAG](/docs/rag-project-analysis/./04-application-scenarios/02-personal-knowledge-management) |
+| 💻 **代码问答** | sweep.ai + LightRAG | [代码库问答RAG](/docs/rag-project-analysis/./04-application-scenarios/03-code-qa) |
+| 📊 **多模态文档** | RAG-Anything | [多模态RAG](/docs/rag-project-analysis/./04-application-scenarios/04-multimodal-rag) |
+| 💬 **智能客服** | onyx + FAQ系统 | [客服问答系统](/docs/rag-project-analysis/./04-application-scenarios/05-customer-service) |
 
 ### 按技术关注点
 
 | 关注点 | 推荐文档 |
 |--------|----------|
-| ⚡ **性能优化** | [性能优化实战](./02-Pipeline节点深度剖析/05-性能优化实战) |
-| 🔍 **检索质量** | [检索架构设计](./02-Pipeline节点深度剖析/01-检索架构设计) |
-| 📄 **文档解析** | [文档解析](./02-Pipeline节点深度剖析/06-文档解析) |
-| 🤖 **Agent 能力** | [Agent能力与实践](./05-Agent能力与实践) |
-| 🔒 **企业级** | [企业级系统设计](./03-企业级系统设计) |
+| ⚡ **性能优化** | [性能优化实战](/docs/rag-project-analysis/./02-pipeline-deep-dive/05-性能优化实战) |
+| 🔍 **检索质量** | [检索架构设计](/docs/rag-project-analysis/./02-pipeline-deep-dive/03-检索架构设计) |
+| 📄 **文档解析** | [文档解析](/docs/rag-project-analysis/./03-data-processing-indexing/01-文档解析技术) |
+| 🤖 **Agent 能力** | [Agent能力与实践](/docs/rag-project-analysis/./05-agent-capabilities) |
+| 🔒 **企业级** | [企业级系统设计](/docs/rag-project-analysis/./03-enterprise-system-design) |
 
 ### 按学习路径
 
-#### 初学者路径（1-2周）
-1. 阅读 [项目全景对比](./01-project-overview) 了解全貌
+#### 初学者路径(1-2周)
+1. 阅读 [项目全景对比](/docs/rag-project-analysis/./01-project-overview) 了解全貌
 2. 选择 LightRAG 跑通基础 Pipeline
-3. 学习 [检索架构设计](./02-pipeline-deep-dive/03-检索架构设计)
-4. 实战 [个人知识管理RAG](./04-application-scenarios/02-个人知识管理RAG)
+3. 学习 [检索架构设计](/docs/rag-project-analysis/./02-pipeline-deep-dive/03-检索架构设计)
+4. 实战 [个人知识管理RAG](/docs/rag-project-analysis/./04-application-scenarios/02-personal-knowledge-management)
 
-#### 进阶路径（2-4周）
-1. 深入 [Pipeline节点深度剖析](./02-pipeline-deep-dive) 全部章节
+#### 进阶路径(2-4周)
+1. 深入 [Pipeline节点深度剖析](/docs/rag-project-analysis/./02-pipeline-deep-dive) 全部章节
 2. 研究 onyx 企业级架构
-3. 实战 [企业知识库RAG](./04-application-scenarios/01-企业知识库RAG)
-4. 学习 [性能优化实战](./02-pipeline-deep-dive/05-性能优化实战)
+3. 实战 [企业知识库RAG](/docs/rag-project-analysis/./04-application-scenarios/01-enterprise-knowledge-base)
+4. 学习 [性能优化实战](/docs/rag-project-analysis/./02-pipeline-deep-dive/05-性能优化实战)
 
 #### 专家路径（持续学习）
-1. 掌握 [Agent能力与实践](./05-agent-capabilities)
-2. 实现 [多模态RAG](./04-application-scenarios/04-多模态RAG)
+1. 掌握 [Agent能力与实践](/docs/rag-project-analysis/./05-agent-capabilities)
+2. 实现 [多模态RAG](/docs/rag-project-analysis/./04-application-scenarios/04-multimodal-rag)
 3. 贡献开源项目或自研系统
 
 ## 学习成果
@@ -218,7 +218,7 @@ description: 基于9个代表性开源项目的深度剖析，从架构设计到
 
 ## 开始学习
 
-建议从 **[01-项目全景对比](./01-项目全景对比)** 开始，建立全局视角后，根据你的需求选择感兴趣的章节深入学习。
+建议从 **[01-项目全景对比](/docs/rag-project-analysis/./01-project-overview)** 开始，建立全局视角后，根据你的需求选择感兴趣的章节深入学习。
 
 每个章节都包含：
 - 📖 理论讲解

@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import type { Metadata } from 'next';
 import 'katex/dist/katex.css';
 import { ContactFloat } from '@/components/contact-float';
+import { GoogleAnalytics } from '@next/third-parties/google';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -68,6 +69,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
         <RootProvider>{children}</RootProvider>
         <ContactFloat />
       </body>
+      <GoogleAnalytics gaId="G-DPV0373FKP" />
     </html>
   );
 }
