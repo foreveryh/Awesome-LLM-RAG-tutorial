@@ -1,0 +1,27 @@
+{
+  "title": "深入 Advanced RAG",
+  "description": "深入理解 RAG 的核心概念、优化策略和实现原理",
+  "pages": [
+    "index",
+    "vector-search-explained",
+    "building-high-quality-rag-systems",
+    "advanced-rag-architecture",
+    "advanced-rag",
+    "why-rag-pipelines-fail",
+    "advance-rag-improve-rag-performance",
+    "rag-tuning-strategies",
+    "text-chunking-strategies",
+    "hyde-hypothetical-document-embeddings",
+    "multimodal-rag",
+    "improving-rag-pipeline-with-three-indexing-methods",
+    "huggingface-train-reranker",
+    "postgres-hybrid-search",
+    "pinecone-chunking-strategies",
+    "pinecone-splade",
+    "splade-sparse-bi-encoder-bert-model",
+    "elasticsearch-rrf",
+    "neo4j-rag-tutorial",
+    "graph-rag-bilingual",
+    "refrag-rethinking-rag-decoding"
+  ]
+}

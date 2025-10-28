@@ -1,0 +1,12 @@
+{
+  "title": "初识 Advanced RAG",
+  "description": "从基础概念到进阶理解，系统性学习 RAG 技术",
+  "pages": [
+    "index",
+    "introduction-to-rag",
+    "interpretation",
+    "complete-rag-survey",
+    "rag-zong-shu-keeping-llms-relevant-and-current",
+    "what-is-agentic-rag-bilingual"
+  ]
+}

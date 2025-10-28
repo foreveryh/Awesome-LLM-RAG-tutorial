@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { MessageCircle, X } from 'lucide-react';
 
 export function ContactFloat() {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
 
   return (
     <>
@@ -61,32 +63,75 @@ export function ContactFloat() {
                   </div>
                 </div>
               </Link>
-              <div className="flex items-center gap-3 rounded-md border border-fd-border bg-fd-muted/30 p-3">
-                <svg
-                  className="h-5 w-5 flex-shrink-0 text-green-600"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
+              <div className="space-y-3">
+                <div
+                  onClick={() => setShowQRCode(!showQRCode)}
+                  className="flex w-full cursor-pointer items-center gap-3 rounded-md border border-fd-border bg-fd-muted/30 p-3 transition-colors hover:bg-fd-accent"
                 >
-                  <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z" />
-                </svg>
-                <div className="flex-1 text-left">
-                  <div className="text-sm font-medium">微信</div>
-                  <div className="text-xs font-mono text-fd-muted-foreground">
-                    browncony999
+                  <Image
+                    src="/icons/wechat.png"
+                    alt="WeChat"
+                    width={20}
+                    height={20}
+                    className="h-5 w-5 flex-shrink-0"
+                  />
+                  <div className="flex-1 text-left">
+                    <div className="text-sm font-medium">微信</div>
+                    <div className="text-xs font-mono text-fd-muted-foreground">
+                      browncony999
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText('browncony999');
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="rounded px-2 py-1 text-xs font-medium transition-colors hover:bg-fd-background"
+                      title="复制微信号"
+                    >
+                      {copied ? '✓ 已复制' : '复制'}
+                    </button>
+                    <svg
+                      className={`h-4 w-4 transition-transform ${
+                        showQRCode ? 'rotate-180' : ''
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText('browncony999');
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className="rounded px-2 py-1 text-xs font-medium transition-colors hover:bg-fd-accent"
-                  title="复制微信号"
-                >
-                  {copied ? '✓ 已复制' : '复制'}
-                </button>
+
+                {/* QR Code Section */}
+                {showQRCode && (
+                  <div className="animate-in slide-in-from-top-2 space-y-2 rounded-md border border-fd-border bg-fd-background p-4">
+                    <p className="text-center text-sm font-medium">
+                      扫码添加微信
+                    </p>
+                    <div className="flex justify-center">
+                      <Image
+                        src="/wechat_browncony999.jpg"
+                        alt="微信二维码"
+                        width={200}
+                        height={200}
+                        className="rounded-lg"
+                      />
+                    </div>
+                    <p className="text-center text-xs text-fd-muted-foreground">
+                      微信号: browncony999
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
             <p className="mt-4 text-xs text-fd-muted-foreground text-center">
