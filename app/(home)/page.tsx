@@ -94,7 +94,7 @@ export default function HomePage() {
           </Link>
 
           <Link
-            href="/docs/初识-Advanced-RAG"
+            href="/docs/advanced-rag-intro"
             className="group rounded-lg border border-fd-border p-6 transition-all hover:border-fd-primary hover:shadow-lg"
           >
             <h3 className="mb-2 text-xl font-semibold group-hover:text-fd-primary">
@@ -106,7 +106,7 @@ export default function HomePage() {
           </Link>
 
           <Link
-            href="/docs/深入-Advanced-RAG"
+            href="/docs/advanced-rag-deep-dive"
             className="group rounded-lg border border-fd-border p-6 transition-all hover:border-fd-primary hover:shadow-lg"
           >
             <h3 className="mb-2 text-xl font-semibold group-hover:text-fd-primary">
@@ -118,7 +118,7 @@ export default function HomePage() {
           </Link>
 
           <Link
-            href="/docs/实践-Advanced-RAG"
+            href="/docs/advanced-rag-practice"
             className="group rounded-lg border border-fd-border p-6 transition-all hover:border-fd-primary hover:shadow-lg"
           >
             <h3 className="mb-2 text-xl font-semibold group-hover:text-fd-primary">
@@ -130,7 +130,7 @@ export default function HomePage() {
           </Link>
 
           <Link
-            href="/docs/从零到一-RAG-实战"
+            href="/docs/brag-tutorial"
             className="group rounded-lg border border-fd-border p-6 transition-all hover:border-fd-primary hover:shadow-lg"
           >
             <h3 className="mb-2 text-xl font-semibold group-hover:text-fd-primary">
@@ -142,7 +142,7 @@ export default function HomePage() {
           </Link>
 
           <Link
-            href="/docs/RAG项目实战分析"
+            href="/docs/rag-project-analysis"
             className="group rounded-lg border border-fd-border p-6 transition-all hover:border-fd-primary hover:shadow-lg"
           >
             <h3 className="mb-2 text-xl font-semibold group-hover:text-fd-primary">
